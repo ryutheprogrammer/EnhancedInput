@@ -4,10 +4,6 @@
 #include "EIModifier.h"
 #include "EITrigger.h"
 #include "EIContext.h"
-#include <UnigineXml.h>
-#include <UnigineFileSystem.h>
-#include <UnigineEditor.h>
-#include <UnigineConsole.h>
 
 using namespace Unigine;
 
@@ -34,20 +30,10 @@ EISystemImpl::EISystemImpl()
 	trigs->registerCreator("Hold", [] { return new EITriggerHold; });
 	trigs->registerCreator("Hold and Release", [] { return new EITriggerHoldAndRelease; });
 	trigs->registerCreator("Tap", [] { return new EITriggerTap; });
-
-	if (!Editor::isLoaded())
-	{
-		auto &ev = Engine::get()->getEventBeginWorldUpdate();
-		ev.connect(_worldUpdateConnection, this, &EISystemImpl::onWorldUpdate);
-	}
 }
 
 EISystemImpl::~EISystemImpl()
 {
-	for (auto &it : _binds)
-		for (auto &binding : it.data)
-			delete binding;
-	_binds.clear();
 }
 
 EISystemImpl *EISystemImpl::get()
@@ -60,20 +46,6 @@ void EISystemImpl::refresh()
 {
 	EIFileSystemRegistryImpl<EIAction>::get()->refresh();
 	EIFileSystemRegistryImpl<EIContext, EIContextImpl>::get()->refresh();
-}
-
-void EISystemImpl::addContext(EIContext *context)
-{
-	auto p = dynamic_cast<EIContextImpl *>(context);
-	if (p && !_contexts.contains(p))
-		_contexts.append(p);
-}
-
-void EISystemImpl::removeContext(EIContext *context)
-{
-	auto p = dynamic_cast<EIContextImpl *>(context);
-	if (p)
-		_contexts.removeOne(p);
 }
 
 EICreatorRegistry<EIModifier> *EISystemImpl::getModifierRegistry()
@@ -94,50 +66,4 @@ EIFileSystemRegistry<EIAction> *EISystemImpl::getActionRegistry()
 EIFileSystemRegistry<EIContext> *EISystemImpl::getContextRegistry()
 {
 	return EIFileSystemRegistryImpl<EIContext, EIContextImpl>::get();
-}
-
-EIBinding *EISystemImpl::bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback)
-{
-	if (!action)
-		return nullptr;
-
-	auto binding = new EIBinding{state, callback};
-	_binds[action].append(binding);
-	return binding;
-}
-
-void EISystemImpl::unbind(const EIAction *action, EIBinding *binding)
-{
-	auto bindsIt = _binds.find(action);
-	if (bindsIt != _binds.end())
-	{
-		bindsIt->data.removeOne(binding);
-		delete binding;
-	}
-}
-
-void EISystemImpl::onWorldUpdate()
-{
-	if (Console::isActive())
-		return;
-
-	for (auto &context : _contexts)
-	{
-		auto triggereds = context->evaluate();
-		for (auto &triggered : triggereds)
-		{
-			auto it = _binds.find(triggered.getAction());
-			if (it != _binds.end())
-			{
-				auto &actionBinds = it->data;
-				for (const auto &actionBind : actionBinds)
-				{
-					if ((int)(actionBind->state & triggered.getState()) != 0)
-					{
-						actionBind->callback(triggered);
-					}
-				}
-			}
-		}
-	}
 }

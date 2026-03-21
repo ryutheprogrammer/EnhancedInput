@@ -10,11 +10,6 @@ static const char *getActionNameWrap(void *, int i)
 	return EISystem::get()->getActionRegistry()->getName(i - 1);
 }
 
-static const char *getKeyNameWrap(void *, int i)
-{
-	return EIKey::getKeysNames()[i];
-}
-
 EIContextEditorWindow::~EIContextEditorWindow()
 {
 	EISystem::get()->getContextRegistry()->destroy(_context);
@@ -93,7 +88,6 @@ void EIContextEditorWindow::onRender()
 
 	if (mappingsOpen)
 	{
-		const EIAction *prevAction = nullptr;
 		int i = -1;
 		for (auto &it : mappingsMap)
 		{
@@ -140,7 +134,6 @@ void EIContextEditorWindow::onRender()
 				for (auto &mapping : mappings)
 				{
 					++j;
-					auto &action = mapping->action;
 
 					auto baseMapId = FMT("%s_mapping[%i]", baseId.get(), j);
 

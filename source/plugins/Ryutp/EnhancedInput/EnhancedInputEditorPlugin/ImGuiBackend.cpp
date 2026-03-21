@@ -32,7 +32,7 @@ static char const *get_clipboard_text(void *)
 
 } // anonymous namespace
 
-void ImGuiBackend::init()
+void ImGuiBackend::init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts)
 {
 	IMGUI_CHECKVERSION();
 
@@ -71,8 +71,10 @@ void ImGuiBackend::init()
 
 	create_font_texture();
 	create_mesh();
-	create_material();
-
+	setMaterialPath(materialPath);
+	for (const auto& font : fonts)
+		addFontFromFileTTF(font.path, font.size, font.glyph_ranges, font.merge);
+	
 	init_theme();
 }
 
@@ -88,6 +90,11 @@ void ImGuiBackend::shutdown()
 		ImGui::DestroyContext(ctx_);
 		ctx_ = nullptr;
 	}
+}
+
+void ImGuiBackend::setMaterialPath(const char *path)
+{
+	material_ = Materials::findMaterialByPath(path)->inherit();
 }
 
 void ImGuiBackend::addFontFromFileTTF(const char *filename, float size_pixels, const ImWchar *glyph_ranges, bool merge)
@@ -324,11 +331,6 @@ void ImGuiBackend::create_mesh()
 	mesh_->setVertexFormat(attributes, 3);
 
 	assert(mesh_->getVertexSize() == sizeof(ImDrawVert) && "Vertex size of MeshDynamic is not equal to size of ImDrawVert");
-}
-
-void ImGuiBackend::create_material()
-{
-	material_ = Materials::findManualMaterial("imgui")->inherit();
 }
 
 void ImGuiBackend::init_keymap()

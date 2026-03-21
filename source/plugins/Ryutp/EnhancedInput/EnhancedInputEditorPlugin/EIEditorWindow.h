@@ -1,5 +1,5 @@
 #pragma once
-#include <EnhancedInput/EnhancedInput.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 #include "ImGuiBackend.h"
 #include <UnigineWidgets.h>
 #include <editor/UnigineEngineGuiWindow.h>

@@ -8,13 +8,23 @@
 struct ImGuiContext;
 class ImFont;
 
+struct FontInfo
+{
+	const char *path;
+	float size;
+	const ImWchar *glyph_ranges = nullptr;
+	bool merge = false;
+};
+
 class ImGuiBackend
 {
 public:
 	virtual ~ImGuiBackend() = default;
 
-	void init();
+	void init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts);
 	void shutdown();
+
+	void setMaterialPath(const char* path);
 
 	void addFontFromFileTTF(const char *filename, float size_pixels, const ImWchar *glyph_ranges = nullptr, bool merge = false);
 	void rebuildFontAtlas();
@@ -25,7 +35,6 @@ public:
 private:
 	void create_font_texture();
 	void create_mesh();
-	void create_material();
 
 	void init_keymap();
 	void init_theme();
@@ -39,18 +48,11 @@ private:
 	int unicode_key_pressed(unsigned int key);
 	void render_callback();
 
+private:
 	ImGuiContext *ctx_{};
 	ImFont *default_font_{};
 	Unigine::TexturePtr font_texture_;
 	Unigine::MeshDynamicPtr mesh_;
 	Unigine::MaterialPtr material_;
 	Unigine::EventConnections event_connections_;
-};
-
-
-class ImGuiBackendScoped: public ImGuiBackend
-{
-public:
-	ImGuiBackendScoped() { init(); }
-	~ImGuiBackendScoped() override { shutdown(); }
 };

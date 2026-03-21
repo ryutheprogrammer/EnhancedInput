@@ -21,7 +21,21 @@ EIEditorWindow::EIEditorWindow(QWidget *parent)
 	getGui()->addChild(_imguiSprite, Gui::ALIGN_OVERLAP);
 	_imguiSprite->setRender(_imguiTexture);
 
-	_imguiBackend.init();
+	{
+		auto materialPath = FileSystem::getAbsolutePath("plugins/Ryutp/EnhancedInput/imgui.basemat");
+		auto fontPath = FileSystem::getAbsolutePath("plugins/Ryutp/EnhancedInput/Font Awesome 7 Free-Solid-900.otf");
+		
+		static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
+		
+		FontInfo fontInfo;
+		fontInfo.path = fontPath;
+		fontInfo.size = 12.0f;
+		fontInfo.glyph_ranges = icons_ranges;
+		fontInfo.merge = true;
+
+		_imguiBackend.init(materialPath, { fontInfo });
+	}
+	
 	ImGuiStyle &style = ImGui::GetStyle();
 	style.FontScaleDpi = getGui()->getDpiScale();
 	style.FontSizeBase = 18;
@@ -29,12 +43,6 @@ EIEditorWindow::EIEditorWindow(QWidget *parent)
 
 	// TODO add button?
 	ImGuiThemes::dark1();
-
-	{
-		auto path = Unigine::FileSystem::getAbsolutePath("Font Awesome 7 Free-Solid-900.otf");
-		static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
-		_imguiBackend.addFontFromFileTTF(path, 12.0f, icons_ranges, true);
-	}
 
 	removeShortcutsExclusiveContext();
 
@@ -171,7 +179,7 @@ void EIEditorWindow::renderFileList(const char *id, const char *name,
 	if (ImGui::Button(FMT(ICON_FA_PLUS "##%s_add", id)))
 	{
 		String path = WindowManager::dialogSaveFile("", ext);
-		if (path != "" && creator(path + '.' + ext))
+		if (path != "" && creator(path))
 			registry->refresh();
 	}
 

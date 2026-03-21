@@ -58,6 +58,8 @@ public:
 	bool isGamepadButton() const noexcept { return getType() == TYPE::GAMEPAD_BUTTON; }
 	bool isGamepadAxis() const noexcept { return getType() == TYPE::GAMEPAD_AXIS; }
 
+	bool isKeyboardMouse() const noexcept { return isKeyboardKey() || isMouseButton() || isMouseAxis(); }
+	bool isGamepad() const noexcept { return isGamepadButton() || isGamepadAxis(); }
 	bool isAxis() const noexcept { return static_cast<unsigned int>(_k) & (1u << 31); }
 
 	float getValue(int device = 0) const noexcept

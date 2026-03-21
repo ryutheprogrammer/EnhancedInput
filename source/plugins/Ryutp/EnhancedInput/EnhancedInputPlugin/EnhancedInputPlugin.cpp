@@ -1,5 +1,6 @@
 #include "EISystem.h"
 #include <UniginePlugin.h>
+#include <UnigineComponentSystem.h>
 
 using namespace Unigine;
 
@@ -19,6 +20,7 @@ public:
 	int init() override
 	{
 		Log::message("Init EnhancedInput\n");
+		ComponentSystem::get()->initialize();
 		EISystemImpl::get()->refresh();
 		return 1;
 	}
@@ -27,11 +29,6 @@ public:
 	{
 		Log::message("Shutdown EnhancedInput\n");
 		return 1;
-	}
-
-	void update() override
-	{
-		// TODO
 	}
 };
 

@@ -1,5 +1,5 @@
 #pragma once
-#include <EnhancedInput/EnhancedInput.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 
 template <class T>
 class EICreatorRegistryImpl: public EICreatorRegistry<T>

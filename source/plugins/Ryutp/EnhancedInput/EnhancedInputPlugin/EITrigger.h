@@ -1,5 +1,5 @@
 #pragma once
-#include <EnhancedInput/EnhancedInput.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 #include <UnigineGame.h>
 
 class EITriggerBase: public EITrigger

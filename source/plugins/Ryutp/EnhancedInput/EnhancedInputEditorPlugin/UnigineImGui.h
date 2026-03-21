@@ -1,5 +1,5 @@
 #pragma once
-#include <EnhancedInput/EnhancedInput.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 #include "imgui/imgui.h"
 #include "IconButton.h"
 #include <UnigineComponentSystem.h>
@@ -129,7 +129,7 @@ void render(const char *baseId, Unigine::Vector<std::shared_ptr<T>> &elements, E
 
 			if (elementOpen)
 			{
-				bool tableOpen = ImGui::BeginTable(FMT("##%s_table", baseElId), 2);
+				bool tableOpen = ImGui::BeginTable(FMT("##%s_table", baseElId.get()), 2);
 				defer
 				{
 					if (tableOpen)

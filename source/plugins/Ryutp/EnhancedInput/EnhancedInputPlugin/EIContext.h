@@ -1,5 +1,6 @@
 #pragma once
-#include <EnhancedInput/EnhancedInput.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
+#include <UnigineHashSet.h>
 
 class EIContextImpl: public EIContext
 {
@@ -19,7 +20,7 @@ public:
 		return _mappings;
 	}
 
-	Unigine::Vector<EIActionValueInstance> evaluate();
+	Unigine::Vector<EIActionValueInstance> evaluate(int gamepadIndex, bool useKeyboardMouse, Unigine::HashSet<int> &consumedKeys);
 
 private:
 	Unigine::Vector<EIKeyActionMapping *> _mappings;

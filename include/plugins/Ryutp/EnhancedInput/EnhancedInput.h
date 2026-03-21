@@ -175,6 +175,7 @@ struct EIKeyActionMapping final
 {
 	const EIAction *action = nullptr;
 	EIKey key;
+	bool consumeInput = true;
 	Unigine::Vector<SPtr<EIModifier>> modifiers;
 	Unigine::Vector<SPtr<EITrigger>> triggers;
 };
@@ -198,10 +199,28 @@ public:
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 struct EIBinding
 {
+	const EIAction *action;
 	eTriggerState state;
 	std::function<void(EIActionValueInstance)> callback;
 };
 
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class EILocalPlayer: public Unigine::ComponentBase
+{
+public:
+	COMPONENT_DEFINE(EILocalPlayer, ComponentBase);
+
+	PROP_PARAM(Toggle, useKeyboardMouse, true);
+	PROP_PARAM(Toggle, useGamepad, false);
+
+	virtual void addContext(EIContext *context, int priority = 0) = 0;
+	virtual void removeContext(EIContext *context) = 0;
+
+	virtual EIBinding *bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback) = 0;
+	virtual void unbind(EIBinding *binding) = 0;
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class EISystem
 {
 public:
@@ -234,15 +253,9 @@ public:
 		return instance;
 	}
 
-	virtual void addContext(EIContext *context) = 0;
-	virtual void removeContext(EIContext *context) = 0;
-
 	virtual EICreatorRegistry<EIModifier> *getModifierRegistry() = 0;
 	virtual EICreatorRegistry<EITrigger> *getTriggerRegistry() = 0;
 
 	virtual EIFileSystemRegistry<EIAction> *getActionRegistry() = 0;
 	virtual EIFileSystemRegistry<EIContext> *getContextRegistry() = 0;
-
-	virtual EIBinding *bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback) = 0;
-	virtual void unbind(const EIAction *action, EIBinding *binding) = 0;
 };

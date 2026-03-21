@@ -47,7 +47,7 @@ void EIContextImpl::unmap()
 	_mappings.clear();
 }
 
-Unigine::Vector<EIActionValueInstance> EIContextImpl::evaluate()
+Unigine::Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool useKeyboardMouse, Unigine::HashSet<int> &consumedKeys)
 {
 	Unigine::HashMap<const EIAction *, EIActionValueInstance> triggered;
 	for (const auto &bind : _mappings)
@@ -56,7 +56,16 @@ Unigine::Vector<EIActionValueInstance> EIContextImpl::evaluate()
 		if (!action)
 			continue;
 
-		auto init = bind->key.getValue(); // TODO device?
+		if (bind->key.isKeyboardMouse() && !useKeyboardMouse)
+			continue;
+		if (bind->key.isGamepad() && gamepadIndex < 0)
+			continue;
+
+		int keyPlain = bind->key.getPlainValue();
+		if (consumedKeys.contains(keyPlain))
+			continue;
+
+		auto init = bind->key.getValue(gamepadIndex >= 0 ? gamepadIndex : 0);
 
 		auto value = EIActionValue{action->valueType, {init, 0, 0}};
 		for (const auto &modifier : bind->modifiers)
@@ -82,13 +91,16 @@ Unigine::Vector<EIActionValueInstance> EIContextImpl::evaluate()
 				state |= trigger->update(value);
 		}
 
+		// consume the key if mapping triggered and consumeInput is set
+		if (bind->consumeInput && state != eTriggerState::None)
+			consumedKeys.append(keyPlain);
+
 		auto current = triggered[action];
 		Unigine::Math::vec3 newVal;
 		switch (action->accumulationBehavior)
 		{
 			case EIActionAccumulationBehavior::Highest:
 			{
-				// TODO think about it
 				auto t = current.getValue().value;
 				auto m = value.value;
 				newVal.x = abs(t.x) > abs(m.x) ? t.x : m.x;
