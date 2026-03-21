@@ -29,7 +29,7 @@ void EIActionEditorWindow::onRender()
 		ImGui::TableNextColumn();
 		ImGui::TextUnformatted("Description");
 		ImGui::TableNextColumn();
-		ImGui::InputText("##action_description", _action->desctiption);
+		ImGui::InputText("##action_description", _action->description);
 
 		ImGui::TableNextColumn();
 		ImGui::TextUnformatted("Value type");

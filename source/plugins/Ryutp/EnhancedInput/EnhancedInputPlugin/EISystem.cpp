@@ -44,6 +44,10 @@ EISystemImpl::EISystemImpl()
 
 EISystemImpl::~EISystemImpl()
 {
+	for (auto &it : _binds)
+		for (auto &binding : it.data)
+			delete binding;
+	_binds.clear();
 }
 
 EISystemImpl *EISystemImpl::get()

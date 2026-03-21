@@ -106,7 +106,7 @@ public:
 struct EIAction final
 {
 	Unigine::String name = "";
-	Unigine::String desctiption = "";
+	Unigine::String description = "";
 	EIActionValueType valueType = EIActionValueType::Boolean;
 	EIActionAccumulationBehavior accumulationBehavior = EIActionAccumulationBehavior::Highest;
 	Unigine::Vector<SPtr<EIModifier>> modifiers;

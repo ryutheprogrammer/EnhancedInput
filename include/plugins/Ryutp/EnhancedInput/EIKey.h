@@ -9,14 +9,14 @@ class EIKey;
 class EIKey
 {
 public:
-	enum class TYPE
+	enum class TYPE : unsigned int
 	{
 		INVALID = 0,
-		MOUSE_BUTTON = 1 << 30,
-		MOUSE_AXIS = (1 << 29) | (1 << 31),
-		KEYBOARD_KEY = 1 << 29,
-		GAMEPAD_BUTTON = 1 << 28,
-		GAMEPAD_AXIS = (1 << 27) | (1 << 31)
+		MOUSE_BUTTON = 1u << 30,
+		MOUSE_AXIS = (1u << 29) | (1u << 31),
+		KEYBOARD_KEY = 1u << 29,
+		GAMEPAD_BUTTON = 1u << 28,
+		GAMEPAD_AXIS = (1u << 27) | (1u << 31)
 	};
 	enum MOUSE_AXIS
 	{
@@ -58,7 +58,7 @@ public:
 	bool isGamepadButton() const noexcept { return getType() == TYPE::GAMEPAD_BUTTON; }
 	bool isGamepadAxis() const noexcept { return getType() == TYPE::GAMEPAD_AXIS; }
 
-	bool isAxis() const noexcept { return _k & (1 << 31); }
+	bool isAxis() const noexcept { return static_cast<unsigned int>(_k) & (1u << 31); }
 
 	float getValue(int device = 0) const noexcept
 	{
@@ -97,6 +97,8 @@ public:
 			case TYPE::GAMEPAD_AXIS:
 			{
 				auto gamepad = Input::getGamePad(device);
+				if (!gamepad)
+					return 0.0f;
 				switch (value)
 				{
 					case Input::GAMEPAD_AXIS::GAMEPAD_AXIS_LEFT_X:

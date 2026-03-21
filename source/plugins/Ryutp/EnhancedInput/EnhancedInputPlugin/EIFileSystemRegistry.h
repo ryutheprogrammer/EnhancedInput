@@ -76,6 +76,9 @@ public:
 
 	void refresh() override
 	{
+		for (auto &it : _loaded)
+			delete it.data;
+		_loaded.clear();
 		_names.clear();
 		_paths.clear();
 
@@ -114,7 +117,11 @@ public:
 		if (!v)
 			return;
 
-		auto it = _loaded.find(getPath(getIndex(v)));
+		int idx = getIndex(v);
+		if (idx < 0)
+			return;
+
+		auto it = _loaded.find(getPath(idx));
 		if (it != _loaded.end())
 		{
 			delete it->data;
@@ -135,9 +142,11 @@ public:
 		auto v = new U;
 		if (!::save(*v, path))
 		{
+			delete v;
 			return false;
 		}
 
+		delete v;
 		refresh();
 		return true;
 	}

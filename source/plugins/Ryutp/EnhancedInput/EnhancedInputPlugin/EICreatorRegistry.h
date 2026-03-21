@@ -71,7 +71,10 @@ public:
 
 	T *create(const char *name) override
 	{
-		return _creators[_names.findIndex(name)]();
+		auto i = _names.findIndex(name);
+		if (i == -1)
+			return nullptr;
+		return _creators[i]();
 	}
 
 	const Unigine::Vector<Unigine::String> &getNames() const noexcept override { return _names; }

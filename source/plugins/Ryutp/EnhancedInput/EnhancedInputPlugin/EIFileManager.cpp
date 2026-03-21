@@ -144,7 +144,7 @@ bool save(const EIContextImpl &v, const char *path)
 void save(const EIAction &v, const Unigine::XmlPtr &xml)
 {
 	xml->setName("EIAction");
-	xml->setArg("description", v.desctiption.get());
+	xml->setArg("description", v.description.get());
 	xml->setArg("value_type", Enum<EIActionValueType>::toString(v.valueType));
 	xml->setArg("accumulation_behavior", Enum<EIActionAccumulationBehavior>::toString(v.accumulationBehavior));
 
@@ -206,7 +206,7 @@ bool load(EIAction &v, const Unigine::XmlPtr &xml)
 		return false;
 	}
 
-	v.desctiption = xml->getArg("description");
+	v.description = xml->getArg("description");
 	v.valueType = Enum<EIActionValueType>::fromString(xml->getArg("value_type"));
 	v.accumulationBehavior = Enum<EIActionAccumulationBehavior>::fromString(xml->getArg("accumulation_behavior"));
 
@@ -222,7 +222,7 @@ bool load(EIAction &v, const Unigine::XmlPtr &xml)
 		}
 	}
 
-	auto triggers = xml->getChild("Modifiers");
+	auto triggers = xml->getChild("Triggers");
 	if (triggers)
 	{
 		v.triggers.resize(triggers->getNumChildren());
