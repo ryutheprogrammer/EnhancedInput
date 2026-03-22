@@ -31,12 +31,12 @@ ENUM(EIActionAccumulationBehavior, Highest, Accumulative);
 
 enum class eTriggerState
 {
-	None = 0,
-	Triggered = 1,
-	Started = 2,
-	Ongoing = 4,
-	Canceled = 8,
-	Completed = 16
+	None = 1,
+	Triggered = 2,
+	Started = 4,
+	Ongoing = 8,
+	Canceled = 16,
+	Completed = 32
 };
 ENUM_FLAG_IMPL(eTriggerState);
 
