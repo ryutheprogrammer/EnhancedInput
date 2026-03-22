@@ -5,8 +5,9 @@
 class EIContextImpl: public EIContext
 {
 public:
+	~EIContextImpl() override { EIContextImpl::unmap(); }
+
 	EIKeyActionMapping *map(const EIAction *action, EIKey key) override;
-	void unmap(const EIAction *action, EIKey key) override;
 	void unmap(const EIAction *action) override;
 	void unmap() override;
 

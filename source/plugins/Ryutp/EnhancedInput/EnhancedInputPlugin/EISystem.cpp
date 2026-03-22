@@ -14,6 +14,7 @@ EISystemImpl::EISystemImpl()
 
 	auto contexts = EIFileSystemRegistryImpl<EIContext, EIContextImpl>::get();
 	contexts->setExtension("input_context");
+	contexts->setCacheEnabled(false);
 
 	auto mods = EICreatorRegistryImpl<EIModifier>::get();
 	mods->setRegistryName("Modifiers");

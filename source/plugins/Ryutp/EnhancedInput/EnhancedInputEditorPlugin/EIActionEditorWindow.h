@@ -14,5 +14,5 @@ public:
 
 private:
 	Unigine::String _path;
-	EIAction *_action;
+	EIAction *_action = nullptr;
 };

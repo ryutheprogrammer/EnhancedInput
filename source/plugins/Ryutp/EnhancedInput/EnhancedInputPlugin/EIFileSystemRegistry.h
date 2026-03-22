@@ -21,6 +21,11 @@ public:
 		_extension = extension;
 	}
 
+	void setCacheEnabled(bool enabled)
+	{
+		_cache = enabled;
+	}
+
 	const char *getExtension() const override
 	{
 		return _extension;
@@ -52,18 +57,24 @@ public:
 		if (i < 0 || i >= _paths.size())
 			return nullptr;
 
-		auto it = _loaded.find(_paths[i]);
-		if (it == _loaded.end())
+		if (_cache)
 		{
-			auto v = new U;
-			auto xml = Unigine::Xml::create();
-			xml->load(_paths[i]);
-			load(*v, xml);
-			v->name = _names[i];
-			_loaded[_paths[i]] = v;
-			return v;
+			auto it = _loaded.find(_paths[i]);
+			if (it != _loaded.end())
+				return it->data;
 		}
-		return it->data;
+
+		auto v = new U;
+		auto xml = Unigine::Xml::create();
+		xml->load(_paths[i]);
+		load(*v, xml);
+		v->name = _names[i];
+		v->guid = Unigine::FileSystem::getGUID(_paths[i]);
+
+		if (_cache)
+			_loaded[_paths[i]] = v;
+
+		return v;
 	}
 
 	T *create(const char *name) override
@@ -71,17 +82,26 @@ public:
 		return create(_names.findIndex(name));
 	}
 
+	T *create(const Unigine::UGUID &guid) override
+	{
+		for (int i = 0; i < _paths.size(); i++)
+		{
+			auto v = create(i);
+			if (v && v->guid == guid)
+				return v;
+		}
+		return nullptr;
+	}
+
 	void refresh() override
 	{
-		for (auto &it : _loaded)
-			delete it.data;
-		_loaded.clear();
 		_names.clear();
 		_paths.clear();
 
 		Unigine::Vector<Unigine::String> paths;
 		Unigine::FileSystem::getVirtualFiles(paths);
 
+		Unigine::HashSet<Unigine::String> activePaths;
 		for (const auto &path : paths)
 		{
 			if (path.extension() == _extension)
@@ -91,8 +111,22 @@ public:
 				{
 					_names.append(name);
 					_paths.append(path);
+					activePaths.append(path);
 				}
 			}
+		}
+
+		// remove cached entries that no longer exist on disk
+		Unigine::Vector<Unigine::String> stale;
+		for (const auto &it : _loaded)
+		{
+			if (!activePaths.contains(it.key))
+				stale.append(it.key);
+		}
+		for (const auto &key : stale)
+		{
+			delete _loaded[key];
+			_loaded.remove(key);
 		}
 	}
 
@@ -108,24 +142,42 @@ public:
 		if (!v)
 			return;
 
-		int idx = getIndex(v);
-		if (idx < 0)
-			return;
-
-		auto it = _loaded.find(getPath(idx));
-		if (it != _loaded.end())
+		if (_cache)
 		{
-			delete it->data;
-			_loaded.erase(it);
+			int idx = getIndex(v);
+			if (idx < 0)
+				return;
+
+			auto it = _loaded.find(getPath(idx));
+			if (it != _loaded.end())
+			{
+				delete it->data;
+				_loaded.erase(it);
+			}
+		} else
+		{
+			delete v;
 		}
 	}
 
 	bool save(int i) override
 	{
+		if (!_cache)
+			return false;
+
 		auto v = create(i);
-		auto xml = Unigine::Xml::create();
 		auto p = dynamic_cast<U *>(v);
 		return ::save(*p, _paths[i]);
+	}
+
+	bool save(T *v) override
+	{
+		int idx = getIndex(v);
+		if (idx < 0)
+			return false;
+
+		auto p = dynamic_cast<U *>(v);
+		return ::save(*p, _paths[idx]);
 	}
 
 	bool saveDummy(const char *path) override
@@ -143,6 +195,7 @@ public:
 	}
 
 private:
+	bool _cache = true;
 	Unigine::String _extension;
 	Unigine::Vector<Unigine::String> _names;
 	Unigine::Vector<Unigine::String> _paths;

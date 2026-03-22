@@ -24,18 +24,18 @@ EIEditorWindow::EIEditorWindow(QWidget *parent)
 	{
 		auto materialPath = FileSystem::getAbsolutePath("plugins/Ryutp/EnhancedInput/imgui.basemat");
 		auto fontPath = FileSystem::getAbsolutePath("plugins/Ryutp/EnhancedInput/Font Awesome 7 Free-Solid-900.otf");
-		
+
 		static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
-		
+
 		FontInfo fontInfo;
 		fontInfo.path = fontPath;
 		fontInfo.size = 12.0f;
 		fontInfo.glyph_ranges = icons_ranges;
 		fontInfo.merge = true;
 
-		_imguiBackend.init(materialPath, { fontInfo });
+		_imguiBackend.init(materialPath, {fontInfo});
 	}
-	
+
 	ImGuiStyle &style = ImGui::GetStyle();
 	style.FontScaleDpi = getGui()->getDpiScale();
 	style.FontSizeBase = 18;

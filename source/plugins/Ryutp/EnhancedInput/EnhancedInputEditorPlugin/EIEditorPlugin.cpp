@@ -7,6 +7,7 @@
 #include <QMenu>
 #include <UnigineComponentSystem.h>
 #include <UnigineEngine.h>
+#include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 
 EIEditorPlugin::EIEditorPlugin() = default;
 EIEditorPlugin::~EIEditorPlugin() = default;
@@ -47,6 +48,8 @@ void EIEditorPlugin::toggleWindow()
 	{
 		if (UnigineEditor::WindowManager::isHidden(_eiEditorWindow))
 		{
+			EISystem::get()->getActionRegistry()->refresh();
+			EISystem::get()->getContextRegistry()->refresh();
 			UnigineEditor::WindowManager::show(_eiEditorWindow);
 		}
 		return;

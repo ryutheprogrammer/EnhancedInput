@@ -61,12 +61,12 @@ public:
 
 	const char *getName(int i) const override
 	{
-		return _names[i];
+		return i >= 0 && i < _names.size() ? _names[i].get() : nullptr;
 	}
 
 	T *create(int i) override
 	{
-		return _creators[i]();
+		return i >= 0 && i < _creators.size() ? _creators[i]() : nullptr;
 	}
 
 	T *create(const char *name) override

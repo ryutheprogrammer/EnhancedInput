@@ -14,5 +14,5 @@ public:
 
 private:
 	Unigine::String _path;
-	EIContext *_context;
+	EIContext *_context = nullptr;
 };

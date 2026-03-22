@@ -86,7 +86,8 @@ inline const char *getNamePoly(void *d, int i)
 }
 
 template <class T>
-void render(const char *baseId, Unigine::Vector<std::shared_ptr<T>> &elements, EICreatorRegistry<T> *registry)
+void render(const char *baseId, Unigine::Vector<std::shared_ptr<T>> &elements, EICreatorRegistry<T> *registry,
+	std::function<void(const char *, std::shared_ptr<T> &)> extraRender = nullptr)
 {
 	constexpr auto FLAGS = ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed | ImGuiTreeNodeFlags_DrawLinesToNodes | ImGuiTreeNodeFlags_SpanAllColumns;
 
@@ -137,7 +138,11 @@ void render(const char *baseId, Unigine::Vector<std::shared_ptr<T>> &elements, E
 				};
 
 				if (tableOpen)
+				{
 					ImGui::Input(FMT("##%s", baseElId.get()), elements[i].get());
+					if (extraRender)
+						extraRender(baseElId.get(), elements[i]);
+				}
 			}
 
 			++i;
