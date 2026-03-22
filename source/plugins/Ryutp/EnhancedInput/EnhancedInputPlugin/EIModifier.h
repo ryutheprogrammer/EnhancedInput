@@ -19,9 +19,9 @@ public:
 class EIModifierScale: public EIModifier
 {
 public:
-	PROP_PARAM(Float, x, true)
-	PROP_PARAM(Float, y, true)
-	PROP_PARAM(Float, z, true)
+	PROP_PARAM(Float, x, 1.0f)
+	PROP_PARAM(Float, y, 1.0f)
+	PROP_PARAM(Float, z, 1.0f)
 
 	const char *getClassName() const noexcept override { return "Scale"; }
 

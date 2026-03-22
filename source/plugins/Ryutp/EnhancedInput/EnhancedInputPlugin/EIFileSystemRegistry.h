@@ -3,9 +3,6 @@
 #include "EIFileManager.h"
 #include <UnigineFileSystem.h>
 
-void autoregister(EIAction *action);
-void autoregister(EIContext *context);
-
 template <class T, class U = T, class = std::enable_if_t<std::is_base_of_v<T, U>, void *>>
 class EIFileSystemRegistryImpl: public EIFileSystemRegistry<T>
 {
@@ -96,12 +93,6 @@ public:
 					_paths.append(path);
 				}
 			}
-		}
-
-		for (int i = 0; i < getCount(); ++i)
-		{
-			auto v = create(i);
-			autoregister(v);
 		}
 	}
 

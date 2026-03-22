@@ -31,12 +31,12 @@ ENUM(EIActionAccumulationBehavior, Highest, Accumulative);
 
 enum class eTriggerState
 {
-	None = 1 << 0,
-	Triggered = 1 << 1,
-	Started = 1 << 2,
-	Ongoing = 1 << 3,
-	Canceled = 1 << 4,
-	Completed = 1 << 5
+	None = 0,
+	Triggered = 1,
+	Started = 2,
+	Ongoing = 4,
+	Canceled = 8,
+	Completed = 16
 };
 ENUM_FLAG_IMPL(eTriggerState);
 
@@ -183,6 +183,8 @@ struct EIKeyActionMapping final
 class EIContext
 {
 public:
+	virtual ~EIContext() = default;
+
 	Unigine::String name = "";
 	Unigine::String description = "";
 	bool autoRegistration = false;

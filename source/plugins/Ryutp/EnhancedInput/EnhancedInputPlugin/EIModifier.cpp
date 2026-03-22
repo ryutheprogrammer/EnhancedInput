@@ -2,17 +2,15 @@
 
 EIActionValue EIModifierNegate::modify(EIActionValue v)
 {
-	v.value.x = x ? -v.value.x : v.value.x;
-	v.value.y = y ? -v.value.y : v.value.y;
-	v.value.z = z ? -v.value.z : v.value.z;
+	vec3 m(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);
+	v.value *= m;
 	return v;
 }
 
 EIActionValue EIModifierScale::modify(EIActionValue v)
 {
-	v.value.x *= x;
-	v.value.y *= y;
-	v.value.z *= z;
+	vec3 m(x, y, z);
+	v.value *= m;
 	return v;
 }
 

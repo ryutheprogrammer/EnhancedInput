@@ -179,6 +179,9 @@ void EIEditorWindow::renderFileList(const char *id, const char *name,
 	if (ImGui::Button(FMT(ICON_FA_PLUS "##%s_add", id)))
 	{
 		String path = WindowManager::dialogSaveFile("", ext);
+		if (path != "" && path.extension() != ext)
+			path = String::format("%s.%s", path.get(), ext);
+
 		if (path != "" && creator(path))
 			registry->refresh();
 	}
