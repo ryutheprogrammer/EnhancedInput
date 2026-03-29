@@ -32,36 +32,41 @@ list(APPEND CMAKE_MODULE_PATH ${PROJECT_SOURCE_DIR}/../../../cmake/modules)
 find_package(Engine REQUIRED MODULE QUIET)
 find_package(Editor REQUIRED MODULE QUIET)
 
+if(UNIX)
+    set(OpenGL_GL_PREFERENCE GLVND)
+    find_package(OpenGL REQUIRED)
+endif()
+
 # UNIGINE_QTROOT is Unigine related global variable that points to the effective
 # Qt's distributive.
-set(QT5_ROOT "$ENV{UNIGINE_QTROOT}")
-if (QT5_ROOT AND EXISTS "${QT5_ROOT}")
-        list(APPEND CMAKE_PREFIX_PATH ${QT5_ROOT})
+set(Qt6_ROOT "$ENV{UNIGINE_QTROOT}")
+if (Qt6_ROOT AND EXISTS "${Qt6_ROOT}")
+        list(APPEND CMAKE_PREFIX_PATH ${Qt6_ROOT})
 endif()
 
 # The following construct is required as Editor's Debug build
-# uses Release binaries of QT5 framework
+# uses Release binaries of Qt6 framework
 set(temp_map_imported ${CMAKE_MAP_IMPORTED_CONFIG_DEBUG})
 set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG RELEASE)
 
 # Find additional required packages
-find_package(Qt5 5.12.3 CONFIG EXACT COMPONENTS Core Gui Widgets)
+find_package(Qt6 6.5.3 CONFIG EXACT COMPONENTS Core Gui Widgets)
 
 # Apply imported_location for qt executable
-get_target_property(MOC_EXECUTABLE Qt5::moc IMPORTED_LOCATION)
-set_target_properties(Qt5::moc PROPERTIES IMPORTED_LOCATION_RELEASE ${MOC_EXECUTABLE})
-get_target_property(RCC_EXECUTABLE Qt5::rcc IMPORTED_LOCATION)
-set_target_properties(Qt5::rcc PROPERTIES IMPORTED_LOCATION_RELEASE ${RCC_EXECUTABLE})
-get_target_property(UIC_EXECUTABLE Qt5::uic IMPORTED_LOCATION)
-set_target_properties(Qt5::uic PROPERTIES IMPORTED_LOCATION_RELEASE ${UIC_EXECUTABLE})
-get_target_property(QMAKE_EXECUTABLE Qt5::qmake IMPORTED_LOCATION)
-set_target_properties(Qt5::qmake PROPERTIES IMPORTED_LOCATION_RELEASE ${QMAKE_EXECUTABLE})
+get_target_property(MOC_EXECUTABLE Qt6::moc IMPORTED_LOCATION)
+set_target_properties(Qt6::moc PROPERTIES IMPORTED_LOCATION_RELEASE ${MOC_EXECUTABLE})
+get_target_property(RCC_EXECUTABLE Qt6::rcc IMPORTED_LOCATION)
+set_target_properties(Qt6::rcc PROPERTIES IMPORTED_LOCATION_RELEASE ${RCC_EXECUTABLE})
+get_target_property(UIC_EXECUTABLE Qt6::uic IMPORTED_LOCATION)
+set_target_properties(Qt6::uic PROPERTIES IMPORTED_LOCATION_RELEASE ${UIC_EXECUTABLE})
+get_target_property(QMAKE_EXECUTABLE Qt6::qmake IMPORTED_LOCATION)
+set_target_properties(Qt6::qmake PROPERTIES IMPORTED_LOCATION_RELEASE ${QMAKE_EXECUTABLE})
 
 # Restore the actual value
 set(CMAKE_MAP_IMPORTED_CONFIG_DEBUG ${temp_map_imported})
 unset(temp_map_imported)
 
-if (NOT Qt5_FOUND)
+if (NOT Qt6_FOUND)
         message(FATAL_ERROR "The required Qt version is not found on your computer, "
 	"please follow this link to see the instructions on resolving this issue. "
 	"https://developer.unigine.com/en/docs/latest/editor2/extensions/environment")
@@ -86,9 +91,9 @@ target_link_libraries(${target}
         PRIVATE
 	Unigine::Engine
 	Unigine::Editor
-	Qt5::Core
-	Qt5::Gui
-	Qt5::Widgets
+	Qt6::Core
+	Qt6::Gui
+	Qt6::Widgets
 )
 
 ##==============================================================================

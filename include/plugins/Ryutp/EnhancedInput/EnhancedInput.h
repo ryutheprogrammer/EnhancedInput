@@ -2,6 +2,7 @@
 #include "EIKey.h"
 #include "Defines.h"
 #include <UnigineComponentSystem.h>
+#include <UnigineGUID.h>
 #include <memory>
 
 #define _REGISTER_SOME(Prefix, Name, Alias)                                                      \
@@ -95,9 +96,11 @@ public:
 
 	virtual T *create(int i) = 0;
 	virtual T *create(const char *name) = 0;
+	virtual T *create(const Unigine::UGUID &guid) = 0;
 	virtual void destroy(T *v) = 0;
 
 	virtual bool save(int i) = 0;
+	virtual bool save(T *v) = 0;
 
 	virtual bool saveDummy(const char *path) = 0;
 };
@@ -105,6 +108,7 @@ public:
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 struct EIAction final
 {
+	Unigine::UGUID guid;
 	Unigine::String name = "";
 	Unigine::String description = "";
 	EIActionValueType valueType = EIActionValueType::Boolean;
@@ -147,7 +151,7 @@ public:
 private:
 	const EIAction *_action = nullptr;
 	EIActionValue _v;
-	eTriggerState _state;
+	eTriggerState _state = eTriggerState::None;
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -171,13 +175,18 @@ public:
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+struct EIKeyBinding final
+{
+	EIKey key;
+	Unigine::Vector<SPtr<EITrigger>> triggers;
+};
+
 struct EIKeyActionMapping final
 {
 	const EIAction *action = nullptr;
-	EIKey key;
-	bool consumeInput = true;
+	Unigine::Vector<EIKeyBinding> bindings; // ALL must fire (AND). bindings[0] provides value.
+	bool consumeInput = false;
 	Unigine::Vector<SPtr<EIModifier>> modifiers;
-	Unigine::Vector<SPtr<EITrigger>> triggers;
 };
 
 class EIContext
@@ -185,12 +194,12 @@ class EIContext
 public:
 	virtual ~EIContext() = default;
 
+	Unigine::UGUID guid;
 	Unigine::String name = "";
 	Unigine::String description = "";
 	bool autoRegistration = false;
 
 	virtual EIKeyActionMapping *map(const EIAction *action, EIKey key) = 0;
-	virtual void unmap(const EIAction *action, EIKey key) = 0;
 	virtual void unmap(const EIAction *action) = 0;
 	virtual void unmap() = 0;
 

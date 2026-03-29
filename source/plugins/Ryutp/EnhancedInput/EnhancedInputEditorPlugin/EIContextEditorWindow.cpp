@@ -106,8 +106,8 @@ void EIContextEditorWindow::onRender()
 				// Consume Input
 				bool rc = ImGui::TreeNodeEx(FMT("Consume Input##%s_consume", baseId.get()),
 					ImGuiTreeNodeFlags_AllowItemOverlap | ImGuiTreeNodeFlags_Framed |
-					ImGuiTreeNodeFlags_DrawLinesToNodes | ImGuiTreeNodeFlags_SpanAllColumns |
-					ImGuiTreeNodeFlags_Leaf);
+						ImGuiTreeNodeFlags_DrawLinesToNodes | ImGuiTreeNodeFlags_SpanAllColumns |
+						ImGuiTreeNodeFlags_Leaf);
 				if (rc)
 				{
 					ImGui::SameLine();
@@ -146,11 +146,80 @@ void EIContextEditorWindow::onRender()
 
 						// Key combo
 						ImGui::SameLine();
-						int ki = EIKey::getKeys().findIndex(binding.key);
-						ImGui::SetNextItemWidth(150);
-						if (Combo(FMT("##%s_key", baseBindId.get()), ki, EIKey::getKeysNames()))
+						ImGui::SetNextItemWidth(200);
+						if (ImGui::BeginCombo(FMT("##%s_key", baseBindId.get()), binding.key.getName()))
 						{
-							binding.key = EIKey::getKeys()[ki];
+							auto &keys = EIKey::getKeys();
+							auto &names = EIKey::getKeysNames();
+
+							const char *currentCat = nullptr;
+							bool catOpen = false;
+
+							for (int ki = 0; ki < keys.size(); ++ki)
+							{
+								const char *cat = keys[ki].getCategoryName();
+								if (cat != currentCat)
+								{
+									if (catOpen)
+										ImGui::TreePop();
+									currentCat = cat;
+									catOpen = cat ? ImGui::TreeNodeEx(cat, ImGuiTreeNodeFlags_SpanAvailWidth) : false;
+								}
+
+								if (cat && !catOpen)
+									continue;
+
+								bool sel = (keys[ki] == binding.key);
+								if (ImGui::Selectable(FMT("%s##key_%i", names[ki].get(), ki), sel))
+									binding.key = keys[ki];
+								if (sel)
+									ImGui::SetItemDefaultFocus();
+							}
+
+							if (catOpen)
+								ImGui::TreePop();
+
+							ImGui::EndCombo();
+						}
+
+						// Key capture
+						ImGui::SameLine();
+						{
+							static ImGuiID captureId = 0;
+							static bool captureSkipFrame = false;
+							ImGuiID thisId = ImGui::GetID(FMT("##%s_capture", baseBindId.get()).get());
+							if (captureId == thisId)
+							{
+								ImGui::Button(FMT(ICON_FA_ELLIPSIS "##%s_capture", baseBindId.get()));
+								if (captureSkipFrame)
+								{
+									captureSkipFrame = false;
+								} else if (Input::isKeyPressed(Input::KEY::KEY_ESC))
+								{
+									captureId = 0;
+								} else
+								{
+									auto &keys = EIKey::getKeys();
+									for (int ki = 1; ki < keys.size(); ++ki)
+									{
+										if (keys[ki].isAxis() || keys[ki].isGamepad())
+											continue;
+										if (keys[ki].getValue() != 0.0f)
+										{
+											binding.key = keys[ki];
+											captureId = 0;
+											break;
+										}
+									}
+								}
+							} else
+							{
+								if (ImGui::Button(FMT(ICON_FA_KEYBOARD "##%s_capture", baseBindId.get())))
+								{
+									captureId = thisId;
+									captureSkipFrame = true;
+								}
+							}
 						}
 
 						ImGui::SameLine();
