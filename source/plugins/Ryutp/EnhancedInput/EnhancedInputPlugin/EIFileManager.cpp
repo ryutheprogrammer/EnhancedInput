@@ -163,26 +163,30 @@ void save(const EIContextImpl &v, const Unigine::XmlPtr &xml)
 	xml->setArg("description", v.description);
 	xml->setArg("auto_registration", String::itoa(v.autoRegistration));
 
-	auto mappings = xml->addChild("Mappings");
-	for (const auto &mapping : v.getMappings())
-		save(mapping, mappings->addChild("Mapping"));
+	auto actions = xml->addChild("Actions");
+	for (const auto &actionMappings : v.getActionMappings())
+		save(actionMappings, actions->addChild("Action"));
 }
 
-void save(const EIKeyActionMapping *v, const Unigine::XmlPtr &xml)
+void save(const EIActionMappings &v, const Unigine::XmlPtr &xml)
 {
-	auto action = xml->addChild("Action");
-	action->setArg("guid", v->action->guid.makeString().get());
-	action->setData(v->action->name.get());
+	if (v.action)
+	{
+		xml->setArg("guid", v.action->guid.makeString().get());
+		xml->setData(v.action->name.get());
+	}
 
-	xml->setArg("consume_input", String::itoa(v->consumeInput));
+	for (const auto &mapping : v.mappings)
+		save(mapping, xml->addChild("Mapping"));
+}
 
-	auto bindings = xml->addChild("Bindings");
-	for (const auto &binding : v->bindings)
-		save(binding, bindings->addChild("Binding"));
+void save(const EIMapping &v, const Unigine::XmlPtr &xml)
+{
+	xml->setArg("consume_input", String::itoa(v.consumeInput));
 
-	auto modifiers = xml->addChild("Modifiers");
-	for (const auto &modifier : v->modifiers)
-		save(modifier.get(), modifiers->addChild("Modifier"));
+	save(v.binding, xml->addChild("Binding"));
+	for (const auto &andKey : v.andKeys)
+		save(andKey, xml->addChild("Binding"));
 }
 
 void save(const EIKeyBinding &v, const Unigine::XmlPtr &xml)
@@ -193,6 +197,10 @@ void save(const EIKeyBinding &v, const Unigine::XmlPtr &xml)
 	auto triggers = xml->addChild("Triggers");
 	for (const auto &trigger : v.triggers)
 		save(trigger.get(), triggers->addChild("Trigger"));
+
+	auto modifiers = xml->addChild("Modifiers");
+	for (const auto &modifier : v.modifiers)
+		save(modifier.get(), modifiers->addChild("Modifier"));
 }
 
 void save(const EIModifier *v, const Unigine::XmlPtr &xml)
@@ -258,76 +266,156 @@ bool load(EIContextImpl &v, const Unigine::XmlPtr &xml)
 	v.description = xml->getArg("description");
 	v.autoRegistration = String::atoi(xml->getArg("auto_registration"));
 
+	// New format: <Actions><Action>...</Action></Actions>
+	auto actions = xml->getChild("Actions");
+	if (actions)
+	{
+		auto &am = v.getActionMappings();
+		int n = actions->getNumChildren();
+		am.resize(n);
+		for (int i = 0; i < n; ++i)
+			load(am[i], actions->getChild(i));
+		return true;
+	}
+
+	// Backward compat: old format <Mappings><Mapping>...</Mapping></Mappings>
 	auto mappings = xml->getChild("Mappings");
 	if (mappings)
 	{
-		int n = mappings->getNumChildren();
-		auto &m = v.getMappings();
-		m.resize(n);
+		auto &am = v.getActionMappings();
+		auto actionRegistry = EISystem::get()->getActionRegistry();
 
-		for (int i = 0; i < n; ++i)
+		for (int i = 0; i < mappings->getNumChildren(); ++i)
 		{
-			m[i] = new EIKeyActionMapping;
-			load(m[i], mappings->getChild(i));
+			auto mappingXml = mappings->getChild(i);
+			auto actionXml = mappingXml->getChild("Action");
+			if (!actionXml)
+				continue;
+
+			const EIAction *action = nullptr;
+			if (actionXml->isArg("guid"))
+				action = actionRegistry->create(UGUID(actionXml->getArg("guid")));
+			if (!action)
+				action = actionRegistry->create(actionXml->getData());
+			if (!action)
+				continue;
+
+			// Find or create EIActionMappings for this action
+			EIActionMappings *entry = nullptr;
+			for (auto &existing : am)
+			{
+				if (existing.action == action)
+				{
+					entry = &existing;
+					break;
+				}
+			}
+			if (!entry)
+			{
+				am.append({action});
+				entry = &am.last();
+			}
+
+			EIMapping mapping;
+			mapping.consumeInput = String::atoi(mappingXml->getArg("consume_input"));
+
+			auto bindingsXml = mappingXml->getChild("Bindings");
+			if (bindingsXml)
+			{
+				int n = bindingsXml->getNumChildren();
+				if (n > 0)
+				{
+					load(mapping.binding, bindingsXml->getChild(0));
+					for (int bi = 1; bi < n; ++bi)
+					{
+						EIKeyBinding andKey;
+						load(andKey, bindingsXml->getChild(bi));
+						mapping.andKeys.append(std::move(andKey));
+					}
+				}
+			}
+			else
+			{
+				// Even older format: <Key> + <Triggers> directly in <Mapping>
+				auto key = mappingXml->getChild("Key");
+				if (key)
+				{
+					mapping.binding.key = EIKey(key->getData());
+					auto triggers = mappingXml->getChild("Triggers");
+					if (triggers)
+					{
+						for (int ti = 0; ti < triggers->getNumChildren(); ++ti)
+						{
+							EITrigger *trigger = nullptr;
+							load(&trigger, triggers->getChild(ti));
+							if (trigger)
+								mapping.binding.triggers.append(SPtr<EITrigger>(trigger));
+						}
+					}
+				}
+			}
+
+			// Old format: modifiers at mapping level -> put on primary binding
+			auto modifiers = mappingXml->getChild("Modifiers");
+			if (modifiers)
+			{
+				for (int mi = 0; mi < modifiers->getNumChildren(); ++mi)
+				{
+					EIModifier *modifier = nullptr;
+					load(&modifier, modifiers->getChild(mi));
+					if (modifier)
+						mapping.binding.modifiers.append(SPtr<EIModifier>(modifier));
+				}
+			}
+
+			entry->mappings.append(std::move(mapping));
 		}
 	}
 
 	return true;
 }
 
-void load(EIKeyActionMapping *v, const Unigine::XmlPtr &xml)
+void load(EIActionMappings &v, const Unigine::XmlPtr &xml)
 {
-	auto action = xml->getChild("Action");
 	auto actionRegistry = EISystem::get()->getActionRegistry();
-	if (action->isArg("guid"))
-		v->action = actionRegistry->create(UGUID(action->getArg("guid")));
-	if (!v->action)
-		v->action = actionRegistry->create(action->getData());
+	if (xml->isArg("guid"))
+		v.action = actionRegistry->create(UGUID(xml->getArg("guid")));
+	if (!v.action)
+		v.action = actionRegistry->create(xml->getData());
 
-	v->consumeInput = String::atoi(xml->getArg("consume_input"));
-
-	auto bindingsXml = xml->getChild("Bindings");
-	if (bindingsXml)
+	for (int i = 0; i < xml->getNumChildren(); ++i)
 	{
-		// New format: <Bindings><Binding>...</Binding></Bindings>
-		int n = bindingsXml->getNumChildren();
-		v->bindings.resize(n);
-		for (int i = 0; i < n; ++i)
-			load(v->bindings[i], bindingsXml->getChild(i));
-	} else
-	{
-		// Backward compat: old format had <Key> + <Triggers> directly in <Mapping>
-		auto key = xml->getChild("Key");
-		if (key)
+		auto child = xml->getChild(i);
+		if (String::compare(child->getName(), "Mapping") == 0)
 		{
-			EIKeyBinding binding;
-			binding.key = EIKey(key->getData());
-
-			auto triggers = xml->getChild("Triggers");
-			if (triggers)
-			{
-				for (int i = 0; i < triggers->getNumChildren(); ++i)
-				{
-					EITrigger *trigger = nullptr;
-					load(&trigger, triggers->getChild(i));
-					if (trigger)
-						binding.triggers.append(SPtr<EITrigger>(trigger));
-				}
-			}
-
-			v->bindings.append(std::move(binding));
+			EIMapping mapping;
+			load(mapping, child);
+			v.mappings.append(std::move(mapping));
 		}
 	}
+}
 
-	auto modifiers = xml->getChild("Modifiers");
-	if (modifiers)
+void load(EIMapping &v, const Unigine::XmlPtr &xml)
+{
+	v.consumeInput = String::atoi(xml->getArg("consume_input"));
+
+	bool first = true;
+	for (int i = 0; i < xml->getNumChildren(); ++i)
 	{
-		v->modifiers.resize(modifiers->getNumChildren());
-		for (int i = 0; i < modifiers->getNumChildren(); ++i)
+		auto child = xml->getChild(i);
+		if (String::compare(child->getName(), "Binding") == 0)
 		{
-			EIModifier *modifier = nullptr;
-			load(&modifier, modifiers->getChild(i));
-			v->modifiers[i].reset(modifier);
+			if (first)
+			{
+				load(v.binding, child);
+				first = false;
+			}
+			else
+			{
+				EIKeyBinding andKey;
+				load(andKey, child);
+				v.andKeys.append(std::move(andKey));
+			}
 		}
 	}
 }
@@ -347,6 +435,18 @@ void load(EIKeyBinding &v, const Unigine::XmlPtr &xml)
 			EITrigger *trigger = nullptr;
 			load(&trigger, triggers->getChild(i));
 			v.triggers[i].reset(trigger);
+		}
+	}
+
+	auto modifiers = xml->getChild("Modifiers");
+	if (modifiers)
+	{
+		v.modifiers.resize(modifiers->getNumChildren());
+		for (int i = 0; i < modifiers->getNumChildren(); ++i)
+		{
+			EIModifier *modifier = nullptr;
+			load(&modifier, modifiers->getChild(i));
+			v.modifiers[i].reset(modifier);
 		}
 	}
 }

@@ -179,14 +179,20 @@ struct EIKeyBinding final
 {
 	EIKey key;
 	Unigine::Vector<SPtr<EITrigger>> triggers;
+	Unigine::Vector<SPtr<EIModifier>> modifiers;
 };
 
-struct EIKeyActionMapping final
+struct EIMapping final
+{
+	EIKeyBinding binding;                    // primary key (provides value)
+	Unigine::Vector<EIKeyBinding> andKeys;   // additional AND keys (usually empty)
+	bool consumeInput = false;
+};
+
+struct EIActionMappings final
 {
 	const EIAction *action = nullptr;
-	Unigine::Vector<EIKeyBinding> bindings; // ALL must fire (AND). bindings[0] provides value.
-	bool consumeInput = false;
-	Unigine::Vector<SPtr<EIModifier>> modifiers;
+	Unigine::Vector<EIMapping> mappings;     // OR alternatives
 };
 
 class EIContext
@@ -199,12 +205,12 @@ public:
 	Unigine::String description = "";
 	bool autoRegistration = false;
 
-	virtual EIKeyActionMapping *map(const EIAction *action, EIKey key) = 0;
+	virtual EIMapping *map(const EIAction *action, EIKey key) = 0;
 	virtual void unmap(const EIAction *action) = 0;
 	virtual void unmap() = 0;
 
-	virtual Unigine::Vector<EIKeyActionMapping *> &getMappings() noexcept = 0;
-	virtual const Unigine::Vector<EIKeyActionMapping *> &getMappings() const noexcept = 0;
+	virtual Unigine::Vector<EIActionMappings> &getActionMappings() noexcept = 0;
+	virtual const Unigine::Vector<EIActionMappings> &getActionMappings() const noexcept = 0;
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -5,24 +5,22 @@
 class EIContextImpl: public EIContext
 {
 public:
-	~EIContextImpl() override { EIContextImpl::unmap(); }
-
-	EIKeyActionMapping *map(const EIAction *action, EIKey key) override;
+	EIMapping *map(const EIAction *action, EIKey key) override;
 	void unmap(const EIAction *action) override;
 	void unmap() override;
 
-	Unigine::Vector<EIKeyActionMapping *> &getMappings() noexcept override
+	Unigine::Vector<EIActionMappings> &getActionMappings() noexcept override
 	{
-		return _mappings;
+		return _actionMappings;
 	}
 
-	const Unigine::Vector<EIKeyActionMapping *> &getMappings() const noexcept override
+	const Unigine::Vector<EIActionMappings> &getActionMappings() const noexcept override
 	{
-		return _mappings;
+		return _actionMappings;
 	}
 
 	Unigine::Vector<EIActionValueInstance> evaluate(int gamepadIndex, bool useKeyboardMouse, Unigine::HashSet<int> &consumedKeys);
 
 private:
-	Unigine::Vector<EIKeyActionMapping *> _mappings;
+	Unigine::Vector<EIActionMappings> _actionMappings;
 };
