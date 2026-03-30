@@ -32,7 +32,7 @@ static char const *get_clipboard_text(void *)
 
 } // anonymous namespace
 
-void ImGuiBackend::init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts)
+void ImGuiBackend::init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts, float defaultFontSize)
 {
 	IMGUI_CHECKVERSION();
 
@@ -67,7 +67,9 @@ void ImGuiBackend::init(const char* materialPath, const Unigine::Vector<FontInfo
 	io.ClipboardUserData = nullptr;
 
 	ImGui::SetCurrentContext(ctx_);
-	default_font_ = ImGui::GetIO().Fonts->AddFontDefault();
+	ImFontConfig fontConfig;
+	fontConfig.SizePixels = defaultFontSize;
+	default_font_ = ImGui::GetIO().Fonts->AddFontDefault(&fontConfig);
 
 	create_font_texture();
 	create_mesh();

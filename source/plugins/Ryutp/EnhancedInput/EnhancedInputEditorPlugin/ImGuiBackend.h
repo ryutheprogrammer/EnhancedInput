@@ -21,7 +21,7 @@ class ImGuiBackend
 public:
 	virtual ~ImGuiBackend() = default;
 
-	void init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts);
+	void init(const char* materialPath, const Unigine::Vector<FontInfo> &fonts, float defaultFontSize = 13.0f);
 	void shutdown();
 
 	void setMaterialPath(const char* path);

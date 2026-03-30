@@ -27,13 +27,16 @@ EIEditorWindow::EIEditorWindow(QWidget *parent)
 
 		static const ImWchar icons_ranges[] = {ICON_MIN_FA, ICON_MAX_FA, 0};
 
+		float dpiScale = getGui()->getDpiScale();
+		float rasterSize = 18.0f * dpiScale;
+
 		FontInfo fontInfo;
 		fontInfo.path = fontPath;
-		fontInfo.size = 12.0f;
+		fontInfo.size = rasterSize;
 		fontInfo.glyph_ranges = icons_ranges;
 		fontInfo.merge = true;
 
-		_imguiBackend.init(materialPath, {fontInfo});
+		_imguiBackend.init(materialPath, {fontInfo}, rasterSize);
 	}
 
 	ImGuiStyle &style = ImGui::GetStyle();
