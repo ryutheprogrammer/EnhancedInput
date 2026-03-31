@@ -77,19 +77,26 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 				if (trigger)
 					combinedState |= trigger->update(primaryValue);
 			}
-			if (combinedState == eTriggerState::None)
-				continue;
 
 			// AND keys
 			bool allActive = true;
 			for (const auto &andKey : mapping.andKeys)
 			{
 				if (andKey.key.isKeyboardMouse() && !useKeyboardMouse)
-				{ allActive = false; break; }
+				{
+					allActive = false;
+					break;
+				}
 				if (andKey.key.isGamepad() && gamepadIndex < 0)
-				{ allActive = false; break; }
+				{
+					allActive = false;
+					break;
+				}
 				if (consumedKeys.contains(andKey.key.getPlainValue()))
-				{ allActive = false; break; }
+				{
+					allActive = false;
+					break;
+				}
 
 				float andValue = andKey.key.getValue(gpDevice);
 				EIActionValue andBindingValue{action->valueType, {andValue, 0, 0}};
@@ -101,7 +108,10 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 						andState |= trigger->update(andBindingValue);
 				}
 				if (andState == eTriggerState::None)
-				{ allActive = false; break; }
+				{
+					allActive = false;
+					break;
+				}
 
 				combinedState = (eTriggerState)((int)combinedState & (int)andState);
 			}
