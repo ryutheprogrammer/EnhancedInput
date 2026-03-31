@@ -149,6 +149,8 @@ void EIContextEditorWindow::onRender()
 	};
 
 	ImGui::SameLine();
+	ImGui::Spacing();
+	ImGui::SameLine();
 	if (ImGui::Button(ICON_FA_PLUS "##action_add"))
 	{
 		_context->getActionMappings().append({});
@@ -221,7 +223,7 @@ void EIContextEditorWindow::onRender()
 						};
 
 						ImGui::SameLine();
-						if (ImGui::Button(FMT(ICON_FA_PLUS " AND##%s_add_and", baseMappingId.get())))
+						if (ImGui::Button(FMT(ICON_FA_LINK "##%s_add_and", baseMappingId.get())))
 							mapping.andKeys.append({});
 
 						ImGui::SameLine();
@@ -300,7 +302,7 @@ void EIContextEditorWindow::onRender()
 						renderKeyComboAndCapture(baseMappingId.get(), mapping.binding);
 
 						ImGui::SameLine();
-						if (ImGui::Button(FMT(ICON_FA_PLUS " AND##%s_add_and", baseMappingId.get())))
+						if (ImGui::Button(FMT(ICON_FA_LINK "##%s_add_and", baseMappingId.get())))
 							mapping.andKeys.append({});
 
 						ImGui::SameLine();
