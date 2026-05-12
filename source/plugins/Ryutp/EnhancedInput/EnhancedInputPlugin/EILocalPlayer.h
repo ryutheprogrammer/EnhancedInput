@@ -14,7 +14,7 @@ public:
 	COMPONENT_DEFINE(EILocalPlayerImpl, EILocalPlayer)
 	COMPONENT_INIT(init, INT_MIN)
 	COMPONENT_UPDATE(update)
-	COMPONENT_SHUTDOWN(shutdown)
+	COMPONENT_SHUTDOWN(shutdown, INT_MAX)
 
 	void addContext(EIContext *context, int priority = 0) override;
 	void removeContext(EIContext *context) override;
