@@ -33,7 +33,7 @@ eTriggerState EITriggerReleased::updateImpl(EIActionValue v)
 	return eTriggerState::None;
 }
 
-float EITriggerTimeBased::calcHeldDur(const EIActionValue &v) const
+float EITriggerTimeBased::calcHeldDur() const
 {
 	return heldDuration + Unigine::Game::getIFps();
 }
@@ -46,7 +46,7 @@ eTriggerState EITriggerTimeBased::updateImpl(EIActionValue v)
 		return eTriggerState::None;
 	}
 
-	heldDuration = calcHeldDur(v);
+	heldDuration = calcHeldDur();
 	return eTriggerState::Ongoing;
 }
 
@@ -55,7 +55,7 @@ eTriggerState EITriggerHold::updateImpl(EIActionValue v)
 	auto state = EITriggerTimeBased::updateImpl(v);
 
 	bool isFirstTriggered = !_triggered;
-	_triggered = heldDuration >= holdTreshold;
+	_triggered = heldDuration >= holdThreshold;
 	if (_triggered)
 	{
 		return isFirstTriggered ? eTriggerState::Triggered : eTriggerState::None;
@@ -66,11 +66,11 @@ eTriggerState EITriggerHold::updateImpl(EIActionValue v)
 
 eTriggerState EITriggerHoldAndRelease::updateImpl(EIActionValue v)
 {
-	float d = calcHeldDur(v);
+	float d = calcHeldDur();
 
 	auto state = EITriggerTimeBased::updateImpl(v);
 
-	if (d >= holdTreshold && state == eTriggerState::None)
+	if (d >= holdThreshold && state == eTriggerState::None)
 		state = eTriggerState::Triggered;
 
 	return state;
@@ -81,10 +81,10 @@ eTriggerState EITriggerTap::updateImpl(EIActionValue v)
 	float lastHeldDuration = heldDuration;
 	auto state = EITriggerTimeBased::updateImpl(v);
 
-	if (isActive(lastValue) && state == eTriggerState::None && lastHeldDuration < tapReleaseTimeTreshold)
+	if (isActive(lastValue) && state == eTriggerState::None && lastHeldDuration < tapReleaseTime)
 		return eTriggerState::Triggered;
 
-	if (heldDuration >= tapReleaseTimeTreshold)
+	if (heldDuration >= tapReleaseTime)
 		return eTriggerState::None;
 
 	return state;

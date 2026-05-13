@@ -7,7 +7,7 @@ class EITriggerBase: public EITrigger
 public:
 	EIActionValue lastValue;
 
-	bool isActive(const EIActionValue &v) const { return v.getMagnitude2() >= treshold * treshold; }
+	bool isActive(const EIActionValue &v) const { return v.getMagnitude2() >= threshold * threshold; }
 
 	eTriggerState update(EIActionValue v) override;
 
@@ -54,9 +54,9 @@ protected:
 class EITriggerTimeBased: public EITriggerBase
 {
 public:
-	PROP_PARAM(Float, heldDuration, 0.0f);
+	float heldDuration = 0.0f;
 
-	float calcHeldDur(const EIActionValue &v) const;
+	float calcHeldDur() const;
 
 protected:
 	eTriggerState updateImpl(EIActionValue v) override;
@@ -65,9 +65,15 @@ protected:
 class EITriggerHold: public EITriggerTimeBased
 {
 public:
-	PROP_PARAM(Float, holdTreshold, 0.5f)
+	float holdThreshold = 0.5f;
 
 	const char *getClassName() const noexcept override { return "Hold"; }
+
+	void serialize(EISerializer &s) override
+	{
+		EITriggerBase::serialize(s);
+		s.io("holdThreshold", holdThreshold);
+	}
 
 protected:
 	eTriggerState updateImpl(EIActionValue v) override;
@@ -79,9 +85,15 @@ private:
 class EITriggerHoldAndRelease: public EITriggerTimeBased
 {
 public:
-	PROP_PARAM(Float, holdTreshold, 0.5f)
+	float holdThreshold = 0.5f;
 
 	const char *getClassName() const noexcept override { return "Hold and Release"; }
+
+	void serialize(EISerializer &s) override
+	{
+		EITriggerBase::serialize(s);
+		s.io("holdThreshold", holdThreshold);
+	}
 
 protected:
 	eTriggerState updateImpl(EIActionValue v) override;
@@ -90,9 +102,15 @@ protected:
 class EITriggerTap: public EITriggerTimeBased
 {
 public:
-	PROP_PARAM(Float, tapReleaseTimeTreshold, 0.1f)
+	float tapReleaseTime = 0.1f;
 
 	const char *getClassName() const noexcept override { return "Tap"; }
+
+	void serialize(EISerializer &s) override
+	{
+		EITriggerBase::serialize(s);
+		s.io("tapReleaseTime", tapReleaseTime);
+	}
 
 protected:
 	eTriggerState updateImpl(EIActionValue v) override;

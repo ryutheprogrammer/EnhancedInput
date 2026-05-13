@@ -1,5 +1,8 @@
 #include "EIModifier.h"
 
+using namespace Unigine;
+using namespace Unigine::Math;
+
 EIActionValue EIModifierNegate::modify(EIActionValue v)
 {
 	vec3 m(x ? -1 : 1, y ? -1 : 1, z ? -1 : 1);

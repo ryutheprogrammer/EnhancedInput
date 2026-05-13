@@ -1,5 +1,5 @@
 #include "EIEditorPlugin.h"
-#include "EIEditorWindow.h"
+#include "EIQtEditorWindow.h"
 #include <editor/UnigineWindowManager.h>
 #include <editor/UnigineConstants.h>
 #include <UnigineLog.h>
@@ -55,7 +55,7 @@ void EIEditorPlugin::toggleWindow()
 		return;
 	}
 
-	_eiEditorWindow = new EIEditorWindow;
+	_eiEditorWindow = new EIQtEditorWindow;
 	_eiEditorWindow->setWindowTitle("EnhancedInput");
 
 	UnigineEditor::WindowManager::add(_eiEditorWindow, UnigineEditor::WindowManager::NEW_FLOATING_AREA);

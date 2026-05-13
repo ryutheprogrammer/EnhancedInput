@@ -24,7 +24,9 @@ EIMapping *EIContextImpl::map(const EIAction *action, EIKey key)
 		entry = &_actionMappings.last();
 	}
 
-	entry->mappings.append(EIMapping{{key}});
+	EIMapping m;
+	m.bindings.append(EIKeyBinding{key});
+	entry->mappings.append(std::move(m));
 	return &entry->mappings.last();
 }
 
@@ -56,7 +58,11 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 
 		for (const auto &mapping : actionEntry.mappings)
 		{
-			const auto &primary = mapping.binding;
+			if (mapping.bindings.size() == 0)
+				continue;
+
+			// bindings[0] = primary (value source), bindings[1..] = AND gates.
+			const auto &primary = mapping.bindings[0];
 
 			if (primary.key.isKeyboardMouse() && !useKeyboardMouse)
 				continue;
@@ -78,10 +84,11 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 					combinedState |= trigger->update(primaryValue);
 			}
 
-			// AND keys
+			// AND gates (remaining bindings).
 			bool allActive = true;
-			for (const auto &andKey : mapping.andKeys)
+			for (int bi = 1; bi < mapping.bindings.size(); ++bi)
 			{
+				const auto &andKey = mapping.bindings[bi];
 				if (andKey.key.isKeyboardMouse() && !useKeyboardMouse)
 				{
 					allActive = false;
@@ -145,9 +152,8 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 			// Consume keys
 			if (mapping.consumeInput && (int)(state & eTriggerState::Triggered) != 0)
 			{
-				consumedKeys.append(primary.key.getPlainValue());
-				for (const auto &andKey : mapping.andKeys)
-					consumedKeys.append(andKey.key.getPlainValue());
+				for (const auto &b : mapping.bindings)
+					consumedKeys.append(b.key.getPlainValue());
 			}
 
 			// Accumulate

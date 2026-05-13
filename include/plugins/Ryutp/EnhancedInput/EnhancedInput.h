@@ -1,6 +1,7 @@
 #pragma once
 #include "EIKey.h"
 #include "Defines.h"
+#include "EISerializer.h"
 #include <UnigineComponentSystem.h>
 #include <UnigineGUID.h>
 #include <memory>
@@ -155,23 +156,31 @@ private:
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-class EIModifier: public Unigine::ComponentStruct
+class EIModifier
 {
 public:
+	virtual ~EIModifier() = default;
+
 	virtual const char *getClassName() const noexcept = 0;
 
 	virtual EIActionValue modify(EIActionValue v) = 0;
+
+	virtual void serialize(EISerializer &) {}
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-class EITrigger: public Unigine::ComponentStruct
+class EITrigger
 {
 public:
-	PROP_PARAM(Float, treshold, 0.5f);
+	virtual ~EITrigger() = default;
+
+	float threshold = 0.5f;
 
 	virtual const char *getClassName() const noexcept = 0;
 
 	virtual eTriggerState update(EIActionValue v) = 0;
+
+	virtual void serialize(EISerializer &s) { s.io("threshold", threshold); }
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -184,8 +193,9 @@ struct EIKeyBinding final
 
 struct EIMapping final
 {
-	EIKeyBinding binding;                    // primary key (provides value)
-	Unigine::Vector<EIKeyBinding> andKeys;   // additional AND keys (usually empty)
+	// bindings[0] is the value source ("primary"); bindings[1..] act as AND gates
+	// (their value is ignored — only their trigger-state activity is checked).
+	Unigine::Vector<EIKeyBinding> bindings;
 	bool consumeInput = false;
 };
 

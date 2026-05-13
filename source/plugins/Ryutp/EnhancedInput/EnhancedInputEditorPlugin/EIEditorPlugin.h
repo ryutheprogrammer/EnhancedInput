@@ -4,7 +4,7 @@
 #include <QObject>
 
 class QAction;
-class EIEditorWindow;
+class EIQtEditorWindow;
 
 class EIEditorPlugin: public QObject, public ::UnigineEditor::Plugin
 {
@@ -25,5 +25,5 @@ private:
 
 private:
 	QAction *_eiEditorWindowAction = nullptr;
-	EIEditorWindow *_eiEditorWindow = nullptr;
+	EIQtEditorWindow *_eiEditorWindow = nullptr;
 };
