@@ -196,6 +196,7 @@ struct EIMapping final
 	// bindings[0] is the value source ("primary"); bindings[1..] act as AND gates
 	// (their value is ignored — only their trigger-state activity is checked).
 	Unigine::Vector<EIKeyBinding> bindings;
+	Unigine::String description = "";
 	bool consumeInput = false;
 };
 

@@ -3,7 +3,9 @@
 #include "EIKeyPicker.h"
 #include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 
+#include <QCheckBox>
 #include <QComboBox>
+#include <QDoubleSpinBox>
 #include <QFormLayout>
 #include <QFrame>
 #include <QHBoxLayout>
@@ -14,8 +16,8 @@
 #include <QMessageBox>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QSpinBox>
 #include <QSplitter>
-#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -48,6 +50,99 @@ QToolButton *makeIconBtn(const QString &text, const QString &tip = QString())
 }
 
 
+// Serializer that renders each parameter as its own QTreeWidgetItem child
+// (instead of stacked QFormLayout rows). Each row gets a [label][value] widget
+// via setItemWidget, so the tree's zebra stripes paint per parameter.
+class EIQtTreeSerializer: public EISerializer
+{
+public:
+	EIQtTreeSerializer(QTreeWidget *tree, QTreeWidgetItem *parent)
+		: _tree(tree)
+		, _parent(parent)
+	{}
+
+	using EISerializer::io;
+
+	void io(const char *name, bool &v) override
+	{
+		auto *cb = new QCheckBox;
+		cb->setChecked(v);
+		cb->setMinimumHeight(22);
+		QObject::connect(cb, &QCheckBox::toggled, [&v](bool x) { v = x; });
+		addParamRow(name, cb);
+	}
+
+	void io(const char *name, int &v) override
+	{
+		auto *sp = new QSpinBox;
+		sp->setRange(INT_MIN, INT_MAX);
+		sp->setValue(v);
+		sp->setMaximumWidth(120);
+		QObject::connect(sp, qOverload<int>(&QSpinBox::valueChanged),
+			[&v](int x) { v = x; });
+		addParamRow(name, sp);
+	}
+
+	void io(const char *name, float &v) override
+	{
+		auto *sp = new QDoubleSpinBox;
+		sp->setRange(-1e9, 1e9);
+		sp->setDecimals(3);
+		sp->setSingleStep(0.1);
+		sp->setValue(v);
+		sp->setMaximumWidth(120);
+		QObject::connect(sp, qOverload<double>(&QDoubleSpinBox::valueChanged),
+			[&v](double x) { v = static_cast<float>(x); });
+		addParamRow(name, sp);
+	}
+
+	void io(const char *name, Unigine::String &v) override
+	{
+		auto *le = new QLineEdit;
+		le->setText(v.get());
+		le->setMaximumWidth(200);
+		QObject::connect(le, &QLineEdit::textChanged,
+			[&v](const QString &x) { v = x.toUtf8().constData(); });
+		addParamRow(name, le);
+	}
+
+protected:
+	void ioEnum(const char *name, int &v, const char *const *items, int count) override
+	{
+		auto *cb = new QComboBox;
+		for (int i = 0; i < count; ++i)
+			cb->addItem(items[i]);
+		if (v >= 0 && v < count)
+			cb->setCurrentIndex(v);
+		QObject::connect(cb, qOverload<int>(&QComboBox::currentIndexChanged),
+			[&v](int x) { v = x; });
+		addParamRow(name, cb);
+	}
+
+private:
+	void addParamRow(const char *name, QWidget *valueWidget)
+	{
+		auto *item = new QTreeWidgetItem();
+		_parent->addChild(item);
+		item->setFirstColumnSpanned(true);
+
+		auto *row = new QWidget;
+		row->setAttribute(Qt::WA_TranslucentBackground);
+		auto *l = new QHBoxLayout(row);
+		l->setContentsMargins(20, 2, 8, 2);
+		l->addWidget(new QLabel(QString("%1:").arg(name)));
+		l->addStretch();
+		l->addWidget(valueWidget);
+
+		row->adjustSize();
+		item->setSizeHint(0, row->sizeHint());
+		_tree->setItemWidget(item, 0, row);
+	}
+
+	QTreeWidget *_tree;
+	QTreeWidgetItem *_parent;
+};
+
 QHBoxLayout *makeSectionHeader(const QString &title, QToolButton *&addBtn)
 {
 	auto *row = new QHBoxLayout;
@@ -66,7 +161,9 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 	Unigine::Vector<std::shared_ptr<T>> &items, EICreatorRegistry<T> *registry,
 	std::function<void()> onChanged)
 {
-	auto defer = [owner, onChanged]() { QTimer::singleShot(0, owner, onChanged); };
+	// Rebuild synchronously — clearLayout uses deleteLater so the click target
+	// (combo/button) stays alive until the event loop unwinds.
+	auto defer = onChanged;
 
 	auto *headerRow = new QHBoxLayout;
 	headerRow->setContentsMargins(0, 0, 0, 0);
@@ -161,23 +258,11 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 		});
 		tree->setItemWidget(headerItem, 1, cell);
 
-		// Child item with parameter form (only when a real trigger/modifier).
+		// Child items: one row per parameter (label left, value right).
 		if (items[i])
 		{
-			auto *paramItem = new QTreeWidgetItem();
-			headerItem->addChild(paramItem);
-			paramItem->setFirstColumnSpanned(true);
-
-			auto *paramWidget = new QWidget;
-			paramWidget->setAttribute(Qt::WA_TranslucentBackground);
-			auto *form = new QFormLayout(paramWidget);
-			form->setContentsMargins(8, 4, 8, 4);
-			EIQtInspectorSerializer s(form);
+			EIQtTreeSerializer s(tree, headerItem);
 			items[i]->serialize(s);
-
-			paramWidget->adjustSize();
-			paramItem->setSizeHint(0, QSize(0, paramWidget->sizeHint().height()));
-			tree->setItemWidget(paramItem, 0, paramWidget);
 		}
 	}
 
@@ -201,7 +286,7 @@ EIQtEditorWindow::EIQtEditorWindow(QWidget *parent)
 	// Visual polish: subtle hover in trees, compact combobox padding.
 	setStyleSheet(
 		"QTreeView::item:hover:!selected { background: palette(midlight); }"
-		"QComboBox { padding: 1px 6px; min-height: 20px; }"
+		"QComboBox { padding: 0px 6px; min-height: 18px; }"
 		"QComboBox::drop-down { width: 16px; }");
 
 	auto *root = new QHBoxLayout(this);
@@ -628,9 +713,7 @@ void EIQtEditorWindow::populateInspectorForAction()
 	s.io("Accumulation", _currentAction->accumulationBehavior);
 	_rightLayout->addLayout(form);
 
-	auto onChanged = [this]() {
-		QTimer::singleShot(0, this, [this]() { populateInspectorForAction(); });
-	};
+	auto onChanged = [this]() { populateInspectorForAction(); };
 
 	renderCreatorList<EIModifier>(this, _rightLayout, "Modifiers", _currentAction->modifiers,
 		EISystem::get()->getModifierRegistry(), onChanged);
@@ -670,7 +753,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			if (!_currentContext)
 				return;
 			_currentContext->getActionMappings().append({});
-			QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+			refreshContextView();
 		});
 		headerRow->addWidget(addEntryBtn);
 		_middleLayout->addLayout(headerRow);
@@ -732,7 +815,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 				bindings.append({});
 				if (auto *t = EISystem::get()->getTriggerRegistry()->create("Down"))
 					bindings.last().triggers.append(SPtr<EITrigger>(t));
-				QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+				refreshContextView();
 			});
 
 			auto *removeMappingBtn = makeIconBtn("×", "Remove mapping");
@@ -757,11 +840,16 @@ void EIQtEditorWindow::populateMiddleForContext()
 						--_currentMappingIdx;
 					}
 				}
-				QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+				refreshContextView();
 			});
 			_tree->setItemWidget(mappingItem, 1, cell);
 
-			// All bindings as children — uniform, all removable.
+			// Single-binding mapping == regular binding: no children, the mapping
+			// row itself represents the binding (its label is the key name).
+			if (mapping.bindings.size() <= 1)
+				continue;
+
+			// AND mapping: list each binding as a child row.
 			for (int bi = 0; bi < mapping.bindings.size(); ++bi)
 			{
 				auto &binding = mapping.bindings[bi];
@@ -794,7 +882,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 						else if (_currentBindingIdx > bi)
 							--_currentBindingIdx;
 					}
-					QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+					refreshContextView();
 				});
 				_tree->setItemWidget(bindingItem, 1, bCell);
 			}
@@ -852,7 +940,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			lastMapping.bindings.append({});
 			if (auto *t = EISystem::get()->getTriggerRegistry()->create("Down"))
 				lastMapping.bindings.last().triggers.append(SPtr<EITrigger>(t));
-			QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+			refreshContextView();
 		});
 
 		auto *removeActionBtn = makeIconBtn("×", "Remove action mapping");
@@ -874,7 +962,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			{
 				--_currentActionIdx;
 			}
-			QTimer::singleShot(0, this, [this]() { refreshContextView(); });
+			refreshContextView();
 		});
 
 		_tree->setItemWidget(actionItem, 1, cell);
@@ -1013,14 +1101,10 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 	clearLayout(_rightLayout);
 
 	auto onStructure = [this]() {
-		QTimer::singleShot(0, this, [this]() {
-			updateSelectionItemText();
-			refreshInspector();
-		});
-	};
-	auto onKeyOnly = [this]() {
 		updateSelectionItemText();
+		refreshInspector();
 	};
+	auto onKeyOnly = [this]() { updateSelectionItemText(); };
 
 	auto addSaveRow = [this]() {
 		_rightLayout->addStretch();
@@ -1034,50 +1118,66 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 		_rightLayout->addLayout(saveRow);
 	};
 
-	// Case 1: mapping row selected — show mapping-level options.
-	if (_currentBindingIdx < 0)
+	// Editing rules:
+	// - AND mapping (size > 1), mapping row: edit only mapping-level (description, consumeInput).
+	// - AND mapping, binding child: edit only that binding (key, triggers, modifiers).
+	//   Description + consumeInput are shared — edit them on the mapping row, not here.
+	// - Single-binding mapping: the mapping IS the binding — edit everything together.
+	EIKeyBinding *binding = nullptr;
+	bool showMappingProps = false;
+	if (_currentBindingIdx >= 0)
 	{
-		_rightLayout->addWidget(new QLabel("<b>Mapping</b>"), 0, Qt::AlignTop);
+		if (_currentBindingIdx >= mapping->bindings.size())
+		{
+			_currentBindingIdx = -1;
+			populateInspectorForMapping(mapping);
+			if (box) box->setUpdatesEnabled(true);
+			return;
+		}
+		binding = &mapping->bindings[_currentBindingIdx];
+	}
+	else if (mapping->bindings.size() == 1)
+	{
+		binding = &mapping->bindings[0];
+		showMappingProps = true;
+	}
+	else
+	{
+		showMappingProps = true;
+	}
 
-		auto *consumeForm = new QFormLayout;
-		consumeForm->setContentsMargins(0, 0, 0, 0);
-		EIQtInspectorSerializer s(consumeForm);
+	_rightLayout->addWidget(
+		new QLabel(binding ? "<b>Binding</b>" : "<b>Mapping</b>"), 0, Qt::AlignTop);
+
+	auto *form = new QFormLayout;
+	form->setContentsMargins(0, 0, 0, 0);
+
+	if (binding)
+	{
+		auto *picker = new EIKeyPicker;
+		picker->setKey(binding->key);
+		connect(picker, &EIKeyPicker::keyChanged, this, [binding, onKeyOnly](const EIKey &k) {
+			binding->key = k;
+			onKeyOnly();
+		});
+		form->addRow("Key", picker);
+	}
+
+	EIQtInspectorSerializer s(form);
+	if (showMappingProps)
+	{
+		s.io("Description", mapping->description);
 		s.io("Consume input", mapping->consumeInput);
-		_rightLayout->addLayout(consumeForm);
-
-		addSaveRow();
-		if (box) box->setUpdatesEnabled(true);
-		return;
 	}
+	_rightLayout->addLayout(form);
 
-	// A binding child is selected — show its key + triggers + modifiers.
-	if (_currentBindingIdx >= mapping->bindings.size())
+	if (binding)
 	{
-		// Stale index; fall back to mapping row.
-		_currentBindingIdx = -1;
-		populateInspectorForMapping(mapping);
-		if (box) box->setUpdatesEnabled(true);
-		return;
+		renderCreatorList<EITrigger>(this, _rightLayout, "Triggers", binding->triggers,
+			EISystem::get()->getTriggerRegistry(), onStructure);
+		renderCreatorList<EIModifier>(this, _rightLayout, "Modifiers", binding->modifiers,
+			EISystem::get()->getModifierRegistry(), onStructure);
 	}
-	EIKeyBinding *binding = &mapping->bindings[_currentBindingIdx];
-
-	_rightLayout->addWidget(new QLabel("<b>Binding</b>"), 0, Qt::AlignTop);
-
-	auto *keyForm = new QFormLayout;
-	keyForm->setContentsMargins(0, 0, 0, 0);
-	auto *picker = new EIKeyPicker;
-	picker->setKey(binding->key);
-	connect(picker, &EIKeyPicker::keyChanged, this, [binding, onKeyOnly](const EIKey &k) {
-		binding->key = k;
-		onKeyOnly();
-	});
-	keyForm->addRow("Key", picker);
-	_rightLayout->addLayout(keyForm);
-
-	renderCreatorList<EITrigger>(this, _rightLayout, "Triggers", binding->triggers,
-		EISystem::get()->getTriggerRegistry(), onStructure);
-	renderCreatorList<EIModifier>(this, _rightLayout, "Modifiers", binding->modifiers,
-		EISystem::get()->getModifierRegistry(), onStructure);
 
 	addSaveRow();
 	if (box) box->setUpdatesEnabled(true);
@@ -1125,6 +1225,8 @@ void EIQtEditorWindow::clearLayout(QLayout *layout)
 {
 	// Note: check count() first — QFormLayout::takeAt(0) on empty layout warns
 	// ("Invalid index 0"), unlike QBoxLayout which silently returns nullptr.
+	// deleteLater (not delete) so we can call this synchronously from a slot
+	// whose emitter widget is among the children being torn down.
 	while (layout->count() > 0)
 	{
 		QLayoutItem *item = layout->takeAt(0);
@@ -1132,8 +1234,9 @@ void EIQtEditorWindow::clearLayout(QLayout *layout)
 			break;
 		if (auto *w = item->widget())
 		{
+			w->hide();
 			w->setParent(nullptr);
-			delete w;
+			w->deleteLater();
 		}
 		else if (auto *l = item->layout())
 		{
