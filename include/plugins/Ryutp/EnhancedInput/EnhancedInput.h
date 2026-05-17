@@ -100,6 +100,11 @@ public:
 	virtual T *create(const Unigine::UGUID &guid) = 0;
 	virtual void destroy(T *v) = 0;
 
+	// Reload the cached instance from disk in place. The pointer stays valid
+	// (so external holders like EIContextImpl keeping `const EIAction *`
+	// references survive). Returns false if v isn't registered.
+	virtual bool reload(T *v) = 0;
+
 	virtual bool save(int i) = 0;
 	virtual bool save(T *v) = 0;
 
@@ -196,13 +201,13 @@ struct EIMapping final
 	// bindings[0] is the value source ("primary"); bindings[1..] act as AND gates
 	// (their value is ignored — only their trigger-state activity is checked).
 	Unigine::Vector<EIKeyBinding> bindings;
-	Unigine::String description = "";
 	bool consumeInput = false;
 };
 
 struct EIActionMappings final
 {
 	const EIAction *action = nullptr;
+	Unigine::String description = "";
 	Unigine::Vector<EIMapping> mappings;     // OR alternatives
 };
 
@@ -286,4 +291,9 @@ public:
 
 	virtual EIFileSystemRegistry<EIAction> *getActionRegistry() = 0;
 	virtual EIFileSystemRegistry<EIContext> *getContextRegistry() = 0;
+
+	// Runs every shipped modifier and trigger through known inputs and asserts
+	// the outputs. Returns the number of failed assertions; 0 means clean run.
+	// Logs PASS/FAIL details to Unigine's console + log.
+	virtual int runSelfTest() = 0;
 };

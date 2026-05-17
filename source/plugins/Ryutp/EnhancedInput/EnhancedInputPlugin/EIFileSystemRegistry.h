@@ -160,6 +160,27 @@ public:
 		}
 	}
 
+	bool reload(T *v) override
+	{
+		if (!v)
+			return false;
+		int idx = getIndex(v);
+		if (idx < 0)
+			return false;
+		auto xml = Unigine::Xml::create();
+		if (!xml->load(_paths[idx]))
+			return false;
+		// create() guarantees the stored pointer is always U; static_cast is
+		// safe (dynamic_cast doesn't compile when T == U for a non-polymorphic
+		// struct like EIAction). load() overwrites every serialized field in
+		// place; name + guid are re-applied from disk so renames stay consistent.
+		auto *u = static_cast<U *>(v);
+		bool ok = load(*u, xml);
+		v->name = _names[idx];
+		v->guid = Unigine::FileSystem::getGUID(_paths[idx]);
+		return ok;
+	}
+
 	bool save(int i) override
 	{
 		if (!_cache)

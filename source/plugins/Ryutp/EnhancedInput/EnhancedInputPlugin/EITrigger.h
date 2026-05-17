@@ -66,6 +66,10 @@ class EITriggerHold: public EITriggerTimeBased
 {
 public:
 	float holdThreshold = 0.5f;
+	// true → fire Triggered once when the threshold is crossed (current default).
+	// false → keep firing Triggered every frame while held past threshold,
+	// useful for "press to charge" / auto-repeat semantics.
+	bool oneShot = true;
 
 	const char *getClassName() const noexcept override { return "Hold"; }
 
@@ -73,6 +77,7 @@ public:
 	{
 		EITriggerBase::serialize(s);
 		s.io("holdThreshold", holdThreshold);
+		s.io("oneShot", oneShot);
 	}
 
 protected:
@@ -114,4 +119,59 @@ public:
 
 protected:
 	eTriggerState updateImpl(EIActionValue v) override;
+};
+
+// Fires Triggered every `interval` seconds while held. Optionally caps at
+// `triggerLimit` total fires; 0 means no cap. With `triggerOnStart=true` the
+// very first frame past actuation also fires (matches Unreal default).
+class EITriggerPulse: public EITriggerTimeBased
+{
+public:
+	float interval = 1.0f;
+	int triggerLimit = 0;
+	bool triggerOnStart = true;
+
+	const char *getClassName() const noexcept override { return "Pulse"; }
+
+	void serialize(EISerializer &s) override
+	{
+		EITriggerBase::serialize(s);
+		s.io("interval", interval);
+		s.io("triggerLimit", triggerLimit);
+		s.io("triggerOnStart", triggerOnStart);
+	}
+
+protected:
+	eTriggerState updateImpl(EIActionValue v) override;
+
+private:
+	int _triggerCount = 0;
+};
+
+// N consecutive short taps within `repeatDelay` of each other trigger the
+// action. Default `numberOfTaps=2` gives a classic double-tap. Tapping longer
+// than `tapReleaseTime` resets the counter.
+class EITriggerRepeatedTap: public EITriggerTimeBased
+{
+public:
+	float tapReleaseTime = 0.2f;
+	float repeatDelay = 0.5f;
+	int numberOfTaps = 2;
+
+	const char *getClassName() const noexcept override { return "Repeated Tap"; }
+
+	void serialize(EISerializer &s) override
+	{
+		EITriggerBase::serialize(s);
+		s.io("tapReleaseTime", tapReleaseTime);
+		s.io("repeatDelay", repeatDelay);
+		s.io("numberOfTaps", numberOfTaps);
+	}
+
+protected:
+	eTriggerState updateImpl(EIActionValue v) override;
+
+private:
+	int _tapCount = 0;
+	float _timeSinceLastTap = 0.0f;
 };

@@ -17,4 +17,6 @@ public:
 
 	EIFileSystemRegistry<EIAction> *getActionRegistry() override;
 	EIFileSystemRegistry<EIContext> *getContextRegistry() override;
+
+	int runSelfTest() override;
 };

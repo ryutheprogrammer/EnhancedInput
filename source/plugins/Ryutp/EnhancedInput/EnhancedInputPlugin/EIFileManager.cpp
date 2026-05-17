@@ -53,6 +53,7 @@ void save(const EIActionMappings &v, const Unigine::XmlPtr &xml)
 		xml->setArg("guid", v.action->guid.makeString().get());
 		xml->setData(v.action->name.get());
 	}
+	xml->setArg("description", v.description.get());
 
 	for (const auto &mapping : v.mappings)
 		save(mapping, xml->addChild("Mapping"));
@@ -60,7 +61,6 @@ void save(const EIActionMappings &v, const Unigine::XmlPtr &xml)
 
 void save(const EIMapping &v, const Unigine::XmlPtr &xml)
 {
-	xml->setArg("description", v.description.get());
 	xml->setArg("consume_input", String::itoa(v.consumeInput));
 
 	// bindings[0] = primary, bindings[1..] = AND gates. Serialized in order.
@@ -204,7 +204,6 @@ bool load(EIContextImpl &v, const Unigine::XmlPtr &xml)
 			}
 
 			EIMapping mapping;
-			mapping.description = mappingXml->getArg("description");
 			mapping.consumeInput = String::atoi(mappingXml->getArg("consume_input"));
 
 			auto bindingsXml = mappingXml->getChild("Bindings");
@@ -268,6 +267,7 @@ void load(EIActionMappings &v, const Unigine::XmlPtr &xml)
 		v.action = actionRegistry->create(UGUID(xml->getArg("guid")));
 	if (!v.action)
 		v.action = actionRegistry->create(xml->getData());
+	v.description = xml->getArg("description");
 
 	for (int i = 0; i < xml->getNumChildren(); ++i)
 	{
@@ -283,7 +283,6 @@ void load(EIActionMappings &v, const Unigine::XmlPtr &xml)
 
 void load(EIMapping &v, const Unigine::XmlPtr &xml)
 {
-	v.description = xml->getArg("description");
 	v.consumeInput = String::atoi(xml->getArg("consume_input"));
 
 	// All <Binding> entries go into v.bindings in order; bindings[0] is primary.

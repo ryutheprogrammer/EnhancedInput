@@ -13,12 +13,22 @@ public:
 	virtual void io(const char *name, float &v) = 0;
 	virtual void io(const char *name, Unigine::String &v) = 0;
 
-	template <class E, std::enable_if_t<std::is_enum_v<E>, int> = 0>
+	// String editor hint for long free-form text. UI serializers should render
+	// a tall multi-line text area; XML/serializers just persist as a string,
+	// so the default falls back to the single-line io().
+	virtual void ioMultiline(const char *name, Unigine::String &v) { io(name, v); }
+
+	template <class E, std::enable_if_t<std::is_enum<E>::value, int> = 0>
 	void io(const char *name, E &v)
 	{
-		int tmp = static_cast<int>(v);
-		ioEnum(name, tmp, Enum<E>::StringItems, Enum<E>::Count);
-		v = static_cast<E>(tmp);
+		// ENUM-macro enums use int as underlying type. Bind ioEnum's int& to
+		// the enum's storage directly — Qt serializers register a widget that
+		// writes back asynchronously when the user changes it, so a local
+		// staging int would be a dangling reference by then.
+		static_assert(sizeof(E) == sizeof(int),
+			"ENUM macro is expected to produce an int-sized enum");
+		ioEnum(name, reinterpret_cast<int &>(v),
+			Enum<E>::StringItems, Enum<E>::Count);
 	}
 
 protected:

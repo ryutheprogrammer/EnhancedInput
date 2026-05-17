@@ -1,4 +1,5 @@
 #include "EIQtEditorWindow.h"
+#include "EIComboBox.h"
 #include "EIQtInspectorSerializer.h"
 #include "EIKeyPicker.h"
 #include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
@@ -18,6 +19,7 @@
 #include <QScrollArea>
 #include <QSpinBox>
 #include <QSplitter>
+#include <QTimer>
 #include <QToolButton>
 #include <QTreeWidget>
 #include <QVBoxLayout>
@@ -56,9 +58,16 @@ QToolButton *makeIconBtn(const QString &text, const QString &tip = QString())
 class EIQtTreeSerializer: public EISerializer
 {
 public:
-	EIQtTreeSerializer(QTreeWidget *tree, QTreeWidgetItem *parent)
+	// Uniform width across spinboxes / comboboxes / line edits in the tree.
+	// Checkboxes are exempt (they're tiny squares — fixing their width would
+	// just stretch dead space around the indicator).
+	static constexpr int kFieldWidth = 120;
+
+	EIQtTreeSerializer(QTreeWidget *tree, QTreeWidgetItem *parent,
+		std::function<void()> onDirty = {})
 		: _tree(tree)
 		, _parent(parent)
+		, _onDirty(std::move(onDirty))
 	{}
 
 	using EISerializer::io;
@@ -68,7 +77,11 @@ public:
 		auto *cb = new QCheckBox;
 		cb->setChecked(v);
 		cb->setMinimumHeight(22);
-		QObject::connect(cb, &QCheckBox::toggled, [&v](bool x) { v = x; });
+		auto onDirty = _onDirty;
+		QObject::connect(cb, &QCheckBox::toggled, [&v, onDirty](bool x) {
+			v = x;
+			if (onDirty) onDirty();
+		});
 		addParamRow(name, cb);
 	}
 
@@ -77,9 +90,13 @@ public:
 		auto *sp = new QSpinBox;
 		sp->setRange(INT_MIN, INT_MAX);
 		sp->setValue(v);
-		sp->setMaximumWidth(120);
+		sp->setFixedWidth(kFieldWidth);
+		auto onDirty = _onDirty;
 		QObject::connect(sp, qOverload<int>(&QSpinBox::valueChanged),
-			[&v](int x) { v = x; });
+			[&v, onDirty](int x) {
+				v = x;
+				if (onDirty) onDirty();
+			});
 		addParamRow(name, sp);
 	}
 
@@ -90,9 +107,13 @@ public:
 		sp->setDecimals(3);
 		sp->setSingleStep(0.1);
 		sp->setValue(v);
-		sp->setMaximumWidth(120);
+		sp->setFixedWidth(kFieldWidth);
+		auto onDirty = _onDirty;
 		QObject::connect(sp, qOverload<double>(&QDoubleSpinBox::valueChanged),
-			[&v](double x) { v = static_cast<float>(x); });
+			[&v, onDirty](double x) {
+				v = static_cast<float>(x);
+				if (onDirty) onDirty();
+			});
 		addParamRow(name, sp);
 	}
 
@@ -100,22 +121,31 @@ public:
 	{
 		auto *le = new QLineEdit;
 		le->setText(v.get());
-		le->setMaximumWidth(200);
+		le->setFixedWidth(kFieldWidth);
+		auto onDirty = _onDirty;
 		QObject::connect(le, &QLineEdit::textChanged,
-			[&v](const QString &x) { v = x.toUtf8().constData(); });
+			[&v, onDirty](const QString &x) {
+				v = x.toUtf8().constData();
+				if (onDirty) onDirty();
+			});
 		addParamRow(name, le);
 	}
 
 protected:
 	void ioEnum(const char *name, int &v, const char *const *items, int count) override
 	{
-		auto *cb = new QComboBox;
+		auto *cb = new EIComboBox;
 		for (int i = 0; i < count; ++i)
 			cb->addItem(items[i]);
 		if (v >= 0 && v < count)
 			cb->setCurrentIndex(v);
+		cb->setFixedWidth(kFieldWidth);
+		auto onDirty = _onDirty;
 		QObject::connect(cb, qOverload<int>(&QComboBox::currentIndexChanged),
-			[&v](int x) { v = x; });
+			[&v, onDirty](int x) {
+				v = x;
+				if (onDirty) onDirty();
+			});
 		addParamRow(name, cb);
 	}
 
@@ -141,6 +171,7 @@ private:
 
 	QTreeWidget *_tree;
 	QTreeWidgetItem *_parent;
+	std::function<void()> _onDirty;
 };
 
 QHBoxLayout *makeSectionHeader(const QString &title, QToolButton *&addBtn)
@@ -159,7 +190,7 @@ QHBoxLayout *makeSectionHeader(const QString &title, QToolButton *&addBtn)
 template <class T>
 void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title,
 	Unigine::Vector<std::shared_ptr<T>> &items, EICreatorRegistry<T> *registry,
-	std::function<void()> onChanged)
+	std::function<void()> onChanged, std::function<void()> onDirty = {})
 {
 	// Rebuild synchronously — clearLayout uses deleteLater so the click target
 	// (combo/button) stays alive until the event loop unwinds.
@@ -201,6 +232,8 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 	tree->setVerticalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	tree->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
 	tree->setSizeAdjustPolicy(QAbstractScrollArea::AdjustToContents);
+	// Selection means nothing here — rows are pure parameter containers.
+	tree->setSelectionMode(QAbstractItemView::NoSelection);
 	tree->header()->setSectionResizeMode(0, QHeaderView::Stretch);
 	tree->header()->setSectionResizeMode(1, QHeaderView::Fixed);
 	tree->setColumnWidth(1, 32);
@@ -218,7 +251,7 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 		tree->addTopLevelItem(headerItem);
 
 		// Col 0: type combo.
-		auto *combo = new QComboBox;
+		auto *combo = new EIComboBox;
 		combo->addItem("(none)");
 		for (int n = 0; n < registry->getCount(); ++n)
 			combo->addItem(registry->getName(n));
@@ -261,7 +294,7 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 		// Child items: one row per parameter (label left, value right).
 		if (items[i])
 		{
-			EIQtTreeSerializer s(tree, headerItem);
+			EIQtTreeSerializer s(tree, headerItem, onDirty);
 			items[i]->serialize(s);
 		}
 	}
@@ -273,6 +306,10 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 	QObject::connect(tree, &QTreeWidget::itemCollapsed, owner,
 		[tree](QTreeWidgetItem *) { tree->updateGeometry(); });
 
+	// Expand all rows by default — the tree is rebuilt on every change, so
+	// leaving params collapsed after a combo change would surprise the user.
+	tree->expandAll();
+
 	layout->addWidget(tree);
 }
 
@@ -283,9 +320,8 @@ EIQtEditorWindow::EIQtEditorWindow(QWidget *parent)
 {
 	setObjectName("EIQtEditorWindow");
 
-	// Visual polish: subtle hover in trees, compact combobox padding.
+	// Compact combobox padding.
 	setStyleSheet(
-		"QTreeView::item:hover:!selected { background: palette(midlight); }"
 		"QComboBox { padding: 0px 6px; min-height: 18px; }"
 		"QComboBox::drop-down { width: 16px; }");
 
@@ -451,6 +487,12 @@ void EIQtEditorWindow::refreshContexts()
 	}
 	_contextList->blockSignals(false);
 	applyContextFilter();
+	// Row labels are fresh; re-stamp the dirty mark if the active context
+	// is still pending unsaved changes.
+	if (_dirty && _currentContext)
+		if (auto *lbl = getActiveAssetLabel())
+			if (!lbl->text().endsWith(" *"))
+				lbl->setText(lbl->text() + " *");
 }
 
 void EIQtEditorWindow::refreshActions()
@@ -470,6 +512,10 @@ void EIQtEditorWindow::refreshActions()
 	}
 	_actionList->blockSignals(false);
 	applyActionFilter();
+	if (_dirty && _currentAction)
+		if (auto *lbl = getActiveAssetLabel())
+			if (!lbl->text().endsWith(" *"))
+				lbl->setText(lbl->text() + " *");
 }
 
 void EIQtEditorWindow::applyContextFilter()
@@ -624,6 +670,27 @@ void EIQtEditorWindow::onRenameAction(int row)
 
 void EIQtEditorWindow::onContextSelected(int row)
 {
+	// Same row re-selected — nothing to do.
+	if (row == _currentContextRow && _currentContext)
+		return;
+
+	if (!promptUnsavedChanges())
+	{
+		// Defer the revert — Qt is still mid-selection update inside its own
+		// currentItemChanged plumbing, so a synchronous setCurrentItem here
+		// gets overwritten when the click handler unwinds. Bouncing back via
+		// QTimer::singleShot(0) lets the selection settle on the new row, then
+		// we snap it back.
+		int prev = _currentContextRow;
+		QTimer::singleShot(0, this, [this, prev]() {
+			_contextList->blockSignals(true);
+			_contextList->setCurrentItem(prev >= 0
+				? _contextList->topLevelItem(prev) : nullptr);
+			_contextList->blockSignals(false);
+		});
+		return;
+	}
+
 	releaseCurrent();
 	if (row < 0)
 		return;
@@ -636,6 +703,8 @@ void EIQtEditorWindow::onContextSelected(int row)
 	_currentContext = registry->create(row);
 	if (!_currentContext)
 		return;
+	_currentContextRow = row;
+	clearDirty();
 
 	if (_middleWidget) _middleWidget->show();
 	populateMiddleForContext();
@@ -644,6 +713,21 @@ void EIQtEditorWindow::onContextSelected(int row)
 
 void EIQtEditorWindow::onActionSelected(int row)
 {
+	if (row == _currentActionRow && _currentAction)
+		return;
+
+	if (!promptUnsavedChanges())
+	{
+		int prev = _currentActionRow;
+		QTimer::singleShot(0, this, [this, prev]() {
+			_actionList->blockSignals(true);
+			_actionList->setCurrentItem(prev >= 0
+				? _actionList->topLevelItem(prev) : nullptr);
+			_actionList->blockSignals(false);
+		});
+		return;
+	}
+
 	releaseCurrent();
 	if (row < 0)
 		return;
@@ -656,6 +740,8 @@ void EIQtEditorWindow::onActionSelected(int row)
 	_currentAction = registry->create(row);
 	if (!_currentAction)
 		return;
+	_currentActionRow = row;
+	clearDirty();
 
 	// Actions edit entirely in the inspector — hide the middle pane.
 	if (_middleWidget) _middleWidget->hide();
@@ -670,26 +756,18 @@ void EIQtEditorWindow::populateInspectorForContext()
 	auto *box = _rightLayout->parentWidget();
 	if (box) box->setUpdatesEnabled(false);
 	clearLayout(_rightLayout);
-	_rightLayout->addWidget(new QLabel("<b>Inspector</b>"), 0, Qt::AlignTop);
+	_rightLayout->addWidget(createInspectorTitle("Inspector"), 0, Qt::AlignTop);
 
 	auto *form = new QFormLayout;
 	form->setContentsMargins(0, 0, 0, 0);
 	form->addRow("Name", new QLabel(_currentContext->name.get()));
-	EIQtInspectorSerializer s(form);
-	s.io("Description", _currentContext->description);
+	EIQtInspectorSerializer s(form, [this] { markDirty(); });
+	s.ioMultiline("Description", _currentContext->description);
 	s.io("Auto register", _currentContext->autoRegistration);
 	_rightLayout->addLayout(form);
 
 	_rightLayout->addStretch();
-
-	auto *saveBtn = new QPushButton("Save");
-	saveBtn->setFixedSize(80, 28);
-	connect(saveBtn, &QPushButton::clicked, this, &EIQtEditorWindow::onSaveContext);
-	auto *saveRow = new QHBoxLayout;
-	saveRow->setContentsMargins(0, 0, 0, 0);
-	saveRow->addStretch();
-	saveRow->addWidget(saveBtn);
-	_rightLayout->addLayout(saveRow);
+	addSaveDiscardRow();
 
 	if (box) box->setUpdatesEnabled(true);
 }
@@ -702,34 +780,91 @@ void EIQtEditorWindow::populateInspectorForAction()
 	auto *box = _rightLayout->parentWidget();
 	if (box) box->setUpdatesEnabled(false);
 	clearLayout(_rightLayout);
-	_rightLayout->addWidget(new QLabel("<b>Inspector</b>"), 0, Qt::AlignTop);
+	_rightLayout->addWidget(createInspectorTitle("Inspector"), 0, Qt::AlignTop);
 
 	auto *form = new QFormLayout;
 	form->setContentsMargins(0, 0, 0, 0);
 	form->addRow("Name", new QLabel(_currentAction->name.get()));
-	EIQtInspectorSerializer s(form);
-	s.io("Description", _currentAction->description);
+	EIQtInspectorSerializer s(form, [this] { markDirty(); });
+	s.ioMultiline("Description", _currentAction->description);
 	s.io("Value type", _currentAction->valueType);
 	s.io("Accumulation", _currentAction->accumulationBehavior);
 	_rightLayout->addLayout(form);
 
-	auto onChanged = [this]() { populateInspectorForAction(); };
+	auto onChanged = [this]() {
+		markDirty();
+		populateInspectorForAction();
+	};
 
+	auto onDirty = [this] { markDirty(); };
 	renderCreatorList<EIModifier>(this, _rightLayout, "Modifiers", _currentAction->modifiers,
-		EISystem::get()->getModifierRegistry(), onChanged);
+		EISystem::get()->getModifierRegistry(), onChanged, onDirty);
 	renderCreatorList<EITrigger>(this, _rightLayout, "Triggers", _currentAction->triggers,
-		EISystem::get()->getTriggerRegistry(), onChanged);
+		EISystem::get()->getTriggerRegistry(), onChanged, onDirty);
 
 	_rightLayout->addStretch();
+	addSaveDiscardRow();
 
-	auto *saveBtn = new QPushButton("Save");
-	saveBtn->setFixedSize(80, 28);
-	connect(saveBtn, &QPushButton::clicked, this, &EIQtEditorWindow::onSaveAction);
-	auto *saveRow = new QHBoxLayout;
-	saveRow->setContentsMargins(0, 0, 0, 0);
-	saveRow->addStretch();
-	saveRow->addWidget(saveBtn);
-	_rightLayout->addLayout(saveRow);
+	if (box) box->setUpdatesEnabled(true);
+}
+
+void EIQtEditorWindow::populateInspectorForActionEntry()
+{
+	if (!_currentContext || _currentActionIdx < 0)
+		return;
+	auto &actions = _currentContext->getActionMappings();
+	if (_currentActionIdx >= actions.size())
+		return;
+	auto &entry = actions[_currentActionIdx];
+
+	auto *box = _rightLayout->parentWidget();
+	if (box) box->setUpdatesEnabled(false);
+	clearLayout(_rightLayout);
+	_rightLayout->addWidget(createInspectorTitle("Action"), 0, Qt::AlignTop);
+
+	auto *form = new QFormLayout;
+	form->setContentsMargins(0, 0, 0, 0);
+
+	auto *reg = EISystem::get()->getActionRegistry();
+	auto *combo = new EIComboBox;
+	combo->addItem("(none)");
+	for (int i = 0; i < reg->getCount(); ++i)
+		combo->addItem(reg->getName(i));
+	int cur = 0;
+	if (entry.action)
+	{
+		int byName = reg->getIndexByName(entry.action->name);
+		if (byName >= 0)
+			cur = byName + 1;
+	}
+	combo->setCurrentIndex(cur);
+	const int ai = _currentActionIdx;
+	connect(combo, qOverload<int>(&QComboBox::activated), this,
+		[this, ai](int newIdx) {
+			if (!_currentContext)
+				return;
+			auto &as = _currentContext->getActionMappings();
+			if (ai < 0 || ai >= as.size())
+				return;
+			auto *r = EISystem::get()->getActionRegistry();
+			as[ai].action = newIdx == 0 ? nullptr : r->create(newIdx - 1);
+			// Reflect the change in the tree row label without a full rebuild.
+			if (_tree)
+			{
+				if (auto *row = _tree->topLevelItem(ai))
+					row->setText(0, as[ai].action
+						? as[ai].action->name.get() : "Invalid");
+			}
+			markDirty();
+		});
+	form->addRow("Action", combo);
+
+	EIQtInspectorSerializer s(form, [this] { markDirty(); });
+	s.ioMultiline("Description", entry.description);
+	_rightLayout->addLayout(form);
+
+	_rightLayout->addStretch();
+	addSaveDiscardRow();
 
 	if (box) box->setUpdatesEnabled(true);
 }
@@ -753,6 +888,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			if (!_currentContext)
 				return;
 			_currentContext->getActionMappings().append({});
+			markDirty();
 			refreshContextView();
 		});
 		headerRow->addWidget(addEntryBtn);
@@ -767,7 +903,6 @@ void EIQtEditorWindow::populateMiddleForContext()
 	_tree->header()->setSectionResizeMode(1, QHeaderView::Fixed);
 	_tree->setColumnWidth(1, 56);
 
-	auto *actionRegistry = EISystem::get()->getActionRegistry();
 	auto &allActions = _currentContext->getActionMappings();
 
 	for (int ai = 0; ai < allActions.size(); ++ai)
@@ -815,6 +950,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 				bindings.append({});
 				if (auto *t = EISystem::get()->getTriggerRegistry()->create("Down"))
 					bindings.last().triggers.append(SPtr<EITrigger>(t));
+				markDirty();
 				refreshContextView();
 			});
 
@@ -840,6 +976,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 						--_currentMappingIdx;
 					}
 				}
+				markDirty();
 				refreshContextView();
 			});
 			_tree->setItemWidget(mappingItem, 1, cell);
@@ -882,39 +1019,17 @@ void EIQtEditorWindow::populateMiddleForContext()
 						else if (_currentBindingIdx > bi)
 							--_currentBindingIdx;
 					}
+					markDirty();
 					refreshContextView();
 				});
 				_tree->setItemWidget(bindingItem, 1, bCell);
 			}
 		}
 
-		// Column 0: action picker combo only.
-		auto *combo = new QComboBox;
-		combo->setMinimumWidth(120);
-		combo->addItem("(none)");
-		for (int i = 0; i < actionRegistry->getCount(); ++i)
-			combo->addItem(actionRegistry->getName(i));
-
-		int currentIdx = 0;
-		if (entry.action)
-		{
-			int byName = actionRegistry->getIndexByName(entry.action->name);
-			if (byName >= 0)
-				currentIdx = byName + 1;
-		}
-		combo->setCurrentIndex(currentIdx);
-
-		connect(combo, qOverload<int>(&QComboBox::activated), this, [this, ai](int newIdx) {
-			if (!_currentContext)
-				return;
-			auto &actions = _currentContext->getActionMappings();
-			if (ai < 0 || ai >= actions.size())
-				return;
-			auto *reg = EISystem::get()->getActionRegistry();
-			actions[ai].action = newIdx == 0 ? nullptr : reg->create(newIdx - 1);
-		});
-
-		_tree->setItemWidget(actionItem, 0, combo);
+		// Column 0: plain action name (or "Invalid" if unset). The picker lives
+		// in the inspector — keeping the row widget-free lets clicks bubble.
+		actionItem->setText(0,
+			entry.action ? entry.action->name.get() : "Invalid");
 
 		// Column 1: + (add mapping) and ✕ (remove action) buttons, right-aligned.
 		auto *cell = new QWidget;
@@ -940,6 +1055,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			lastMapping.bindings.append({});
 			if (auto *t = EISystem::get()->getTriggerRegistry()->create("Down"))
 				lastMapping.bindings.last().triggers.append(SPtr<EITrigger>(t));
+			markDirty();
 			refreshContextView();
 		});
 
@@ -962,6 +1078,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 			{
 				--_currentActionIdx;
 			}
+			markDirty();
 			refreshContextView();
 		});
 
@@ -976,11 +1093,22 @@ void EIQtEditorWindow::populateMiddleForContext()
 			return;
 		auto *parent = item->parent();
 		if (!parent)
-			return; // top-level action item — no inspector
+		{
+			// Top-level action-entry row — inspector shows the entry description.
+			int ai = _tree->indexOfTopLevelItem(item);
+			if (ai < 0)
+				return;
+			_currentActionIdx = ai;
+			_currentMappingIdx = -1;
+			_currentBindingIdx = -1;
+			_currentMapping = nullptr;
+			populateInspectorForActionEntry();
+			return;
+		}
 		auto *grandparent = parent->parent();
 		if (!grandparent)
 		{
-			// Mapping row (parent is action item) — inspector shows mapping-level.
+			// Mapping row (parent is action item).
 			int ai = _tree->indexOfTopLevelItem(parent);
 			int mi = parent->indexOfChild(item);
 			if (ai < 0 || mi < 0)
@@ -992,7 +1120,6 @@ void EIQtEditorWindow::populateMiddleForContext()
 		else
 		{
 			// Binding row (parent = mapping, grandparent = action).
-			// Child 0 = primary, child >=1 = andKeys[idx-1].
 			int ai = _tree->indexOfTopLevelItem(grandparent);
 			int mi = grandparent->indexOfChild(parent);
 			int bi = parent->indexOfChild(item);
@@ -1022,6 +1149,11 @@ void EIQtEditorWindow::refreshContextView()
 			_currentBindingIdx = -1;
 		populateInspectorForMapping(_currentMapping);
 	}
+	else if (_currentContext && _currentActionIdx >= 0
+		&& _currentActionIdx < _currentContext->getActionMappings().size())
+	{
+		populateInspectorForActionEntry();
+	}
 	else
 	{
 		_currentActionIdx = -1;
@@ -1037,6 +1169,9 @@ void EIQtEditorWindow::refreshInspector()
 	setUpdatesEnabled(false);
 	if (_currentMapping)
 		populateInspectorForMapping(_currentMapping);
+	else if (_currentContext && _currentActionIdx >= 0
+		&& _currentActionIdx < _currentContext->getActionMappings().size())
+		populateInspectorForActionEntry();
 	else if (_currentAction)
 		populateInspectorForAction();
 	else if (_currentContext)
@@ -1101,21 +1236,13 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 	clearLayout(_rightLayout);
 
 	auto onStructure = [this]() {
+		markDirty();
 		updateSelectionItemText();
 		refreshInspector();
 	};
-	auto onKeyOnly = [this]() { updateSelectionItemText(); };
-
-	auto addSaveRow = [this]() {
-		_rightLayout->addStretch();
-		auto *saveBtn = new QPushButton("Save");
-		saveBtn->setFixedSize(80, 28);
-		connect(saveBtn, &QPushButton::clicked, this, &EIQtEditorWindow::onSaveContext);
-		auto *saveRow = new QHBoxLayout;
-		saveRow->setContentsMargins(0, 0, 0, 0);
-		saveRow->addStretch();
-		saveRow->addWidget(saveBtn);
-		_rightLayout->addLayout(saveRow);
+	auto onKeyOnly = [this]() {
+		markDirty();
+		updateSelectionItemText();
 	};
 
 	// Editing rules:
@@ -1147,7 +1274,7 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 	}
 
 	_rightLayout->addWidget(
-		new QLabel(binding ? "<b>Binding</b>" : "<b>Mapping</b>"), 0, Qt::AlignTop);
+		createInspectorTitle(binding ? "Binding" : "Mapping"), 0, Qt::AlignTop);
 
 	auto *form = new QFormLayout;
 	form->setContentsMargins(0, 0, 0, 0);
@@ -1163,23 +1290,22 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 		form->addRow("Key", picker);
 	}
 
-	EIQtInspectorSerializer s(form);
+	EIQtInspectorSerializer s(form, [this] { markDirty(); });
 	if (showMappingProps)
-	{
-		s.io("Description", mapping->description);
 		s.io("Consume input", mapping->consumeInput);
-	}
 	_rightLayout->addLayout(form);
 
 	if (binding)
 	{
+		auto onDirty = [this] { markDirty(); };
 		renderCreatorList<EITrigger>(this, _rightLayout, "Triggers", binding->triggers,
-			EISystem::get()->getTriggerRegistry(), onStructure);
+			EISystem::get()->getTriggerRegistry(), onStructure, onDirty);
 		renderCreatorList<EIModifier>(this, _rightLayout, "Modifiers", binding->modifiers,
-			EISystem::get()->getModifierRegistry(), onStructure);
+			EISystem::get()->getModifierRegistry(), onStructure, onDirty);
 	}
 
-	addSaveRow();
+	_rightLayout->addStretch();
+	addSaveDiscardRow();
 	if (box) box->setUpdatesEnabled(true);
 }
 
@@ -1187,17 +1313,173 @@ void EIQtEditorWindow::onSaveContext()
 {
 	if (_currentContext)
 		EISystem::get()->getContextRegistry()->save(_currentContext);
+	clearDirty();
 }
 
 void EIQtEditorWindow::onSaveAction()
 {
 	if (_currentAction)
 		EISystem::get()->getActionRegistry()->save(_currentAction);
+	clearDirty();
+}
+
+void EIQtEditorWindow::onDiscard()
+{
+	// Drop in-memory mutations and reload from disk. The context registry is
+	// uncached so destroy + create works; the action registry is cached and
+	// shares pointers with anyone else holding the action — reload() rewrites
+	// the live instance in place so those references stay valid.
+	bool wasContext = _currentContext != nullptr;
+	bool wasAction = _currentAction != nullptr;
+	int ctxRow = _currentContextRow;
+	int savedActionIdx = _currentActionIdx;
+	int savedMappingIdx = _currentMappingIdx;
+	int savedBindingIdx = _currentBindingIdx;
+
+	if (wasContext)
+	{
+		releaseCurrent();
+		onContextSelected(ctxRow);
+		if (_currentContext)
+		{
+			_currentActionIdx = savedActionIdx;
+			_currentMappingIdx = savedMappingIdx;
+			_currentBindingIdx = savedBindingIdx;
+			refreshContextView();
+		}
+	}
+	else if (wasAction)
+	{
+		// Reload in place — pointer survives, so we can keep _currentAction
+		// without going through release/recreate (which would also force a
+		// dirty-state flip during the re-selection round-trip).
+		EISystem::get()->getActionRegistry()->reload(_currentAction);
+		clearDirty();
+		populateInspectorForAction();
+	}
+}
+
+void EIQtEditorWindow::markDirty()
+{
+	_dirty = true;
+	if (_saveBtn) _saveBtn->setEnabled(true);
+	if (_discardBtn) _discardBtn->setEnabled(true);
+	if (auto *lbl = getActiveAssetLabel())
+	{
+		const QString cur = lbl->text();
+		if (!cur.endsWith(" *"))
+			lbl->setText(cur + " *");
+	}
+}
+
+void EIQtEditorWindow::clearDirty()
+{
+	_dirty = false;
+	if (_saveBtn) _saveBtn->setEnabled(false);
+	if (_discardBtn) _discardBtn->setEnabled(false);
+	if (auto *lbl = getActiveAssetLabel())
+	{
+		const QString cur = lbl->text();
+		if (cur.endsWith(" *"))
+			lbl->setText(cur.left(cur.length() - 2));
+	}
+}
+
+QLabel *EIQtEditorWindow::createInspectorTitle(const QString &base)
+{
+	auto *lbl = new QLabel(QString("<b>%1</b>").arg(base));
+	return lbl;
+}
+
+QLabel *EIQtEditorWindow::getActiveAssetLabel() const
+{
+	// The active asset is either a context (row in _contextList) or an
+	// action (row in _actionList) — never both, since selecting one clears
+	// the other. Look up the corresponding row widget and find its label.
+	QTreeWidget *list = nullptr;
+	int row = -1;
+	if (_currentContext)
+	{
+		list = _contextList;
+		row = _currentContextRow;
+	}
+	else if (_currentAction)
+	{
+		list = _actionList;
+		row = _currentActionRow;
+	}
+	if (!list || row < 0)
+		return nullptr;
+	auto *item = list->topLevelItem(row);
+	if (!item)
+		return nullptr;
+	auto *w = list->itemWidget(item, 0);
+	if (!w)
+		return nullptr;
+	return w->findChild<QLabel *>();
+}
+
+bool EIQtEditorWindow::promptUnsavedChanges()
+{
+	if (!_dirty)
+		return true;
+	auto btn = QMessageBox::question(this,
+		"Unsaved changes",
+		"There are unsaved changes in the current asset. Save them?",
+		QMessageBox::Save | QMessageBox::Discard | QMessageBox::Cancel);
+	if (btn == QMessageBox::Cancel)
+		return false;
+	if (btn == QMessageBox::Save)
+	{
+		if (_currentAction)
+			onSaveAction();
+		else
+			onSaveContext();
+	}
+	else if (btn == QMessageBox::Discard)
+	{
+		// Force-restore disk state on the cached instance. Contexts are
+		// non-cached so destroy+create in the caller already reloads them;
+		// actions are cached and their mutated pointer would survive the
+		// upcoming releaseCurrent, polluting the next create() of the same
+		// asset (or any other holder).
+		if (_currentAction)
+			EISystem::get()->getActionRegistry()->reload(_currentAction);
+	}
+	return true;
+}
+
+void EIQtEditorWindow::addSaveDiscardRow()
+{
+	// Save dispatches based on what's loaded; Discard reloads from disk.
+	_saveBtn = new QPushButton("Save");
+	_saveBtn->setFixedSize(80, 28);
+	_saveBtn->setEnabled(_dirty);
+	connect(_saveBtn.data(), &QPushButton::clicked, this, [this] {
+		if (_currentAction) onSaveAction();
+		else onSaveContext();
+	});
+
+	_discardBtn = new QPushButton("Discard");
+	_discardBtn->setFixedSize(80, 28);
+	_discardBtn->setEnabled(_dirty);
+	connect(_discardBtn.data(), &QPushButton::clicked, this, &EIQtEditorWindow::onDiscard);
+
+	auto *row = new QHBoxLayout;
+	row->setContentsMargins(0, 0, 0, 0);
+	row->addStretch();
+	row->addWidget(_discardBtn.data());
+	row->addWidget(_saveBtn.data());
+	_rightLayout->addLayout(row);
 }
 
 void EIQtEditorWindow::releaseCurrent()
 {
 	if (_middleWidget) _middleWidget->show();
+
+	// Strip the dirty " *" marker from the active list label BEFORE clearing
+	// the current-asset pointers — clearDirty needs both to locate the row.
+	clearDirty();
 
 	clearLayout(_middleLayout);
 	_middleLayout->addWidget(new QLabel("Select a context or action"), 0, Qt::AlignTop);
@@ -1212,6 +1494,8 @@ void EIQtEditorWindow::releaseCurrent()
 	_currentActionIdx = -1;
 	_currentMappingIdx = -1;
 	_currentBindingIdx = -1;
+	_currentContextRow = -1;
+	_currentActionRow = -1;
 
 	if (_currentContext)
 	{
