@@ -1,4 +1,5 @@
 #pragma once
+#include <UnigineString.h>
 #include <QPointer>
 #include <QString>
 #include <QWidget>
@@ -96,4 +97,6 @@ private:
 	// -1 = mapping row (parent), 0 = primary binding, >=1 = andKeys[idx-1]
 	int _currentBindingIdx = -1;
 	bool _dirty = false;
+
+	Unigine::String _cachedDataPath;
 };

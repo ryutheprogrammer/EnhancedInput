@@ -39,7 +39,6 @@ void save(const EIContextImpl &v, const Unigine::XmlPtr &xml)
 {
 	xml->setName("EIContext");
 	xml->setArg("description", v.description);
-	xml->setArg("auto_registration", String::itoa(v.autoRegistration));
 
 	auto actions = xml->addChild("Actions");
 	for (const auto &actionMappings : v.getActionMappings())
@@ -151,7 +150,6 @@ bool load(EIContextImpl &v, const Unigine::XmlPtr &xml)
 	}
 
 	v.description = xml->getArg("description");
-	v.autoRegistration = String::atoi(xml->getArg("auto_registration"));
 
 	// New format: <Actions><Action>...</Action></Actions>
 	auto actions = xml->getChild("Actions");
@@ -216,8 +214,7 @@ bool load(EIContextImpl &v, const Unigine::XmlPtr &xml)
 					load(b, bindingsXml->getChild(bi));
 					mapping.bindings.append(std::move(b));
 				}
-			}
-			else
+			} else
 			{
 				// Even older format: <Key> + <Triggers> directly in <Mapping>
 				auto key = mappingXml->getChild("Key");

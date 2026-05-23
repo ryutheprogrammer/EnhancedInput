@@ -219,7 +219,7 @@ public:
 	Unigine::UGUID guid;
 	Unigine::String name = "";
 	Unigine::String description = "";
-	bool autoRegistration = false;
+	bool enabled = true;
 
 	virtual EIMapping *map(const EIAction *action, EIKey key) = 0;
 	virtual void unmap(const EIAction *action) = 0;
@@ -248,6 +248,7 @@ public:
 
 	virtual void addContext(EIContext *context, int priority = 0) = 0;
 	virtual void removeContext(EIContext *context) = 0;
+	virtual EIContext *findContext(const char *name) = 0;
 
 	virtual EIBinding *bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback) = 0;
 	virtual void unbind(EIBinding *binding) = 0;

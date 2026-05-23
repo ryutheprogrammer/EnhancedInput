@@ -41,6 +41,8 @@ void EILocalPlayerImpl::update()
 	HashSet<int> consumedKeys;
 	for (auto &entry : _contexts)
 	{
+		if (!entry.context->enabled)
+			continue;
 		auto triggereds = entry.context->evaluate(gpIndex, useKeyboardMouse, consumedKeys);
 		for (auto &triggered : triggereds)
 		{
@@ -156,6 +158,31 @@ void EILocalPlayerImpl::removeContext(EIContext *context)
 			return;
 		}
 	}
+}
+
+EIContext *EILocalPlayerImpl::findContext(const char *name)
+{
+	if (!name)
+		return nullptr;
+
+	auto guid = FileSystem::getGUID(name);
+	if (guid.isValid())
+	{
+		for (auto &entry : _contexts)
+		{
+			if (entry.context && entry.context->guid == guid)
+				return entry.context;
+		}
+	} else
+	{
+		for (auto &entry : _contexts)
+		{
+			if (entry.context && entry.context->name == name)
+				return entry.context;
+		}
+	}
+
+	return nullptr;
 }
 
 EIBinding *EILocalPlayerImpl::bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback)

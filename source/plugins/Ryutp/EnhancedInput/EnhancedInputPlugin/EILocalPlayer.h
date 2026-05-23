@@ -18,6 +18,7 @@ public:
 
 	void addContext(EIContext *context, int priority = 0) override;
 	void removeContext(EIContext *context) override;
+	EIContext *findContext(const char *name) override;
 
 	EIBinding *bind(const EIAction *action, eTriggerState state, std::function<void(EIActionValueInstance)> callback) override;
 	void unbind(EIBinding *binding) override;
