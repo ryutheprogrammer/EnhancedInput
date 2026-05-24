@@ -89,6 +89,29 @@ public:
 };
 
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+// User-defined response curve per axis. Mirrors UE's ResponseCurveUser.
+// Sign-preserving: out_axis = sign(v) * curve->evaluate(|v|). Curve domain
+// is therefore [0,1] — matches the editor viewport. Default-constructed
+// curves are linear (0,0)→(1,1), giving identity until the user edits them.
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+class EIModifierResponseCurveUser: public EIModifier
+{
+public:
+	EIModifierResponseCurveUser();
+
+	Unigine::Curve2dPtr x;
+	Unigine::Curve2dPtr y;
+	Unigine::Curve2dPtr z;
+
+	const char *getClassName() const noexcept override
+	{
+		return "Response Curve - User Defined";
+	}
+	EIActionValue modify(EIActionValue v) override;
+	void serialize(EISerializer &s) override;
+};
+
+// %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // Per-axis clamp + saturate(-1,1) + abs() with per-component enable.
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 class EIModifierClamp: public EIModifier

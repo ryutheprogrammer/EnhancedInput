@@ -137,6 +137,18 @@ public:
 		addParamRow(name, le);
 	}
 
+	void io(const char *name, const Unigine::Curve2dPtr &v) override
+	{
+		auto *preview = new EICurve2dPreview(v);
+		auto onDirty = _onDirty;
+		QObject::connect(preview, &EICurve2dPreview::curveChanged,
+			[onDirty]() {
+			if (onDirty)
+				onDirty();
+		});
+		addParamRow(name, preview);
+	}
+
 protected:
 	void ioEnum(const char *name, int &v, const char *const *items, int count) override
 	{

@@ -1,7 +1,7 @@
 #pragma once
 #include "Defines.h"
 #include <UnigineString.h>
-#include <type_traits>
+#include <UnigineCurve2d.h>
 
 class EISerializer
 {
@@ -12,6 +12,10 @@ public:
 	virtual void io(const char *name, int &v) = 0;
 	virtual void io(const char *name, float &v) = 0;
 	virtual void io(const char *name, Unigine::String &v) = 0;
+	// Curves are always heap objects held via Ptr<> — pass the smart pointer
+	// itself by const-ref. Implementations mutate the curve through ->, which
+	// remains legal because const Ptr& doesn't propagate const to the pointee.
+	virtual void io(const char *name, const Unigine::Curve2dPtr &v) = 0;
 
 	// String editor hint for long free-form text. UI serializers should render
 	// a tall multi-line text area; XML/serializers just persist as a string,

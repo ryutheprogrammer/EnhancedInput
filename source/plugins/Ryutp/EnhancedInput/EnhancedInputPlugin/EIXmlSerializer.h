@@ -23,19 +23,30 @@ public:
 
 	void io(const char *name, bool &v) override
 	{
-		if (auto x = find(name)) v = x->getIntData() != 0;
+		if (auto x = find(name))
+			v = x->getIntData() != 0;
 	}
 	void io(const char *name, int &v) override
 	{
-		if (auto x = find(name)) v = x->getIntData();
+		if (auto x = find(name))
+			v = x->getIntData();
 	}
 	void io(const char *name, float &v) override
 	{
-		if (auto x = find(name)) v = x->getFloatData();
+		if (auto x = find(name))
+			v = x->getFloatData();
 	}
 	void io(const char *name, Unigine::String &v) override
 	{
-		if (auto x = find(name)) v = x->getData();
+		if (auto x = find(name))
+			v = x->getData();
+	}
+	void io(const char *name, const Unigine::Curve2dPtr &v) override
+	{
+		if (!v)
+			return;
+		if (auto x = find(name))
+			v->load(x);
 	}
 
 protected:
@@ -60,7 +71,11 @@ private:
 	// Renames in public API → fallback to old typo'd names for existing data files.
 	static const char *legacyAlias(const char *name)
 	{
-		struct A { const char *current; const char *legacy; };
+		struct A
+		{
+			const char *current;
+			const char *legacy;
+		};
 		static constexpr A aliases[] = {
 			{"threshold", "treshold"},
 			{"holdThreshold", "holdTreshold"},
@@ -94,7 +109,8 @@ class EIXmlWriteSerializer: public EISerializer
 public:
 	EIXmlWriteSerializer(const Unigine::XmlPtr &xml)
 		: _xml(xml)
-	{}
+	{
+	}
 
 	using EISerializer::io;
 
@@ -102,6 +118,11 @@ public:
 	void io(const char *name, int &v) override { param(name)->setIntData(v); }
 	void io(const char *name, float &v) override { param(name)->setFloatData(v); }
 	void io(const char *name, Unigine::String &v) override { param(name)->setData(v.get()); }
+	void io(const char *name, const Unigine::Curve2dPtr &v) override
+	{
+		if (v)
+			v->save(param(name));
+	}
 
 protected:
 	void ioEnum(const char *name, int &v, const char *const *items, int count) override

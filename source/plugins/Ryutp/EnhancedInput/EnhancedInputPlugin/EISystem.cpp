@@ -25,6 +25,8 @@ EISystemImpl::EISystemImpl()
 	mods->registerCreator("Dead Zone", [] { return new EIModifierDeadZone; });
 	mods->registerCreator("Response Curve - Exponential",
 		[] { return new EIModifierResponseCurveExponential; });
+	mods->registerCreator("Response Curve - User Defined",
+		[] { return new EIModifierResponseCurveUser; });
 	mods->registerCreator("Clamp", [] { return new EIModifierClamp; });
 	mods->registerCreator("Saturate", [] { return new EIModifierSaturate; });
 	mods->registerCreator("Absolute Value", [] { return new EIModifierAbsoluteValue; });

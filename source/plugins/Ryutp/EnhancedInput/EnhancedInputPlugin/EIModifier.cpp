@@ -186,6 +186,48 @@ void EIModifierResponseCurveExponential::serialize(EISerializer &s)
 	s.io("z", z);
 }
 
+namespace
+{
+// Default curve: linear identity across [-1, 1] — two keys at (-1,-1) and
+// (1,1). Editor viewport matches this range, so the user can shape the
+// negative half independently if they need an asymmetric response.
+Curve2dPtr makeLinearCurve()
+{
+	auto c = Curve2d::create();
+	c->addKey(vec2(-1.0f, -1.0f));
+	c->addKey(vec2(1.0f, 1.0f));
+	return c;
+}
+}
+
+EIModifierResponseCurveUser::EIModifierResponseCurveUser()
+	: x(makeLinearCurve())
+	, y(makeLinearCurve())
+	, z(makeLinearCurve())
+{
+}
+
+EIActionValue EIModifierResponseCurveUser::modify(EIActionValue v)
+{
+	// Direct mapping. Inputs outside [-1, 1] saturate at the curve's
+	// endpoints via Curve2d's REPEAT_MODE_CLAMP — chain a Saturate/Clamp
+	// upstream if you need finer control over out-of-range inputs.
+	auto apply = [](float a, const Curve2dPtr &c) -> float {
+		return c ? c->evaluate(a) : a;
+	};
+	v.value.x = apply(v.value.x, x);
+	v.value.y = apply(v.value.y, y);
+	v.value.z = apply(v.value.z, z);
+	return v;
+}
+
+void EIModifierResponseCurveUser::serialize(EISerializer &s)
+{
+	s.io("x", x);
+	s.io("y", y);
+	s.io("z", z);
+}
+
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 // Clamp / Saturate / Absolute Value.
 // %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%

@@ -1,5 +1,6 @@
 #pragma once
 #include "EIComboBox.h"
+#include "EICurve2dEditor.h"
 #include <plugins/Ryutp/EnhancedInput/EnhancedInput.h>
 #include <QCheckBox>
 #include <QDoubleSpinBox>
@@ -21,7 +22,8 @@ public:
 	EIQtInspectorSerializer(QFormLayout *form, std::function<void()> onDirty = {})
 		: _form(form)
 		, _onDirty(std::move(onDirty))
-	{}
+	{
+	}
 
 	using EISerializer::io;
 
@@ -32,7 +34,8 @@ public:
 		auto onDirty = _onDirty;
 		QObject::connect(cb, &QCheckBox::toggled, [&v, onDirty](bool x) {
 			v = x;
-			if (onDirty) onDirty();
+			if (onDirty)
+				onDirty();
 		});
 		// Force row height to match other widgets so the checkbox sits
 		// vertically centered instead of clinging to the top.
@@ -49,9 +52,10 @@ public:
 		auto onDirty = _onDirty;
 		QObject::connect(sp, qOverload<int>(&QSpinBox::valueChanged),
 			[&v, onDirty](int x) {
-				v = x;
-				if (onDirty) onDirty();
-			});
+			v = x;
+			if (onDirty)
+				onDirty();
+		});
 		_form->addRow(name, sp);
 	}
 
@@ -66,9 +70,10 @@ public:
 		auto onDirty = _onDirty;
 		QObject::connect(sp, qOverload<double>(&QDoubleSpinBox::valueChanged),
 			[&v, onDirty](double x) {
-				v = static_cast<float>(x);
-				if (onDirty) onDirty();
-			});
+			v = static_cast<float>(x);
+			if (onDirty)
+				onDirty();
+		});
 		_form->addRow(name, sp);
 	}
 
@@ -80,9 +85,10 @@ public:
 		auto onDirty = _onDirty;
 		QObject::connect(le, &QLineEdit::textChanged,
 			[&v, onDirty](const QString &x) {
-				v = x.toUtf8().constData();
-				if (onDirty) onDirty();
-			});
+			v = x.toUtf8().constData();
+			if (onDirty)
+				onDirty();
+		});
 		_form->addRow(name, le);
 	}
 
@@ -99,9 +105,22 @@ public:
 		auto onDirty = _onDirty;
 		QObject::connect(te, &QPlainTextEdit::textChanged, [te, &v, onDirty]() {
 			v = te->toPlainText().toUtf8().constData();
-			if (onDirty) onDirty();
+			if (onDirty)
+				onDirty();
 		});
 		_form->addRow(name, te);
+	}
+
+	void io(const char *name, const Unigine::Curve2dPtr &v) override
+	{
+		auto *preview = new EICurve2dPreview(v);
+		auto onDirty = _onDirty;
+		QObject::connect(preview, &EICurve2dPreview::curveChanged,
+			[onDirty]() {
+			if (onDirty)
+				onDirty();
+		});
+		_form->addRow(name, preview);
 	}
 
 protected:
@@ -116,9 +135,10 @@ protected:
 		auto onDirty = _onDirty;
 		QObject::connect(cb, qOverload<int>(&QComboBox::currentIndexChanged),
 			[&v, onDirty](int x) {
-				v = x;
-				if (onDirty) onDirty();
-			});
+			v = x;
+			if (onDirty)
+				onDirty();
+		});
 		_form->addRow(name, cb);
 	}
 
