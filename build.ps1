@@ -55,7 +55,10 @@ function Resolve-SdkPath {
 	}
 	if ($ids.Count -eq 1) { return $installed.($ids[0]).TrimEnd('\', '/') }
 	Write-Host "Select SDK:"
-	for ($i = 0; $i -lt $ids.Count; $i++) { Write-Host "  $($i + 1)) $($ids[$i])" }
+	for ($i = 0; $i -lt $ids.Count; $i++) {
+		$leaf = Split-Path -Leaf $installed.($ids[$i])
+		Write-Host "  $($i + 1)) $($ids[$i])  ($leaf)"
+	}
 	$sel = Read-Host "SDK [1]"; if (-not $sel) { $sel = 1 }
 	$idx = [int]$sel - 1
 	if ($idx -lt 0 -or $idx -ge $ids.Count) { throw "Invalid selection." }

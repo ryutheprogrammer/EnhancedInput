@@ -68,7 +68,7 @@ resolve_sdk_path() {
 	[ -r /dev/tty ] || { echo "ERROR: several SDKs installed; pass --sdk <id> (no TTY for picker)." >&2; awk -F'\t' '{print "  "$1}' <<<"$lines" >&2; return 1; }
 	local ids=() paths=() id path i=1
 	echo "Select SDK:" >&2
-	while IFS=$'\t' read -r id path; do echo "  $i) $id" >&2; ids+=("$id"); paths+=("$path"); i=$((i+1)); done <<<"$lines"
+	while IFS=$'\t' read -r id path; do echo "  $i) $id  ($(basename "$path"))" >&2; ids+=("$id"); paths+=("$path"); i=$((i+1)); done <<<"$lines"
 	local sel; read -r -p "SDK [1]: " sel </dev/tty; sel="${sel:-1}"
 	local idx=$((sel-1))
 	[ "$idx" -ge 0 ] && [ "$idx" -lt "${#paths[@]}" ] 2>/dev/null || { echo "ERROR: invalid selection." >&2; return 1; }
