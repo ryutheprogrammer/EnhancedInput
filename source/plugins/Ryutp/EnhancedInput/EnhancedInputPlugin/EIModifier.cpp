@@ -173,9 +173,13 @@ EIActionValue EIModifierResponseCurveExponential::modify(EIActionValue v)
 		if (e == 1.0f) return a;
 		return sign(a) * pow(abs(a), e);
 	};
-	v.value.x = curve(v.value.x, x);
-	v.value.y = curve(v.value.y, y);
-	v.value.z = curve(v.value.z, z);
+	// Touching only the active axes prevents spurious values from leaking
+	// into components the action's value type doesn't carry — same pattern
+	// as DeadZone above.
+	const int n = axisCount(v.valueType);
+	if (n >= 1) v.value.x = curve(v.value.x, x);
+	if (n >= 2) v.value.y = curve(v.value.y, y);
+	if (n >= 3) v.value.z = curve(v.value.z, z);
 	return v;
 }
 
@@ -213,11 +217,17 @@ EIActionValue EIModifierResponseCurveUser::modify(EIActionValue v)
 	// endpoints via Curve2d's REPEAT_MODE_CLAMP — chain a Saturate/Clamp
 	// upstream if you need finer control over out-of-range inputs.
 	auto apply = [](float a, const Curve2dPtr &c) -> float {
-		return c ? c->evaluate(a) : a;
+		// evaluate() on a zero-key curve is UB. Pass-through is the only
+		// meaningful behavior — the editor blocks deleting the last key,
+		// so this is a safety net for hand-edited XML / null Ptr.
+		if (!c || c->getNumKeys() == 0)
+			return a;
+		return c->evaluate(a);
 	};
-	v.value.x = apply(v.value.x, x);
-	v.value.y = apply(v.value.y, y);
-	v.value.z = apply(v.value.z, z);
+	const int n = axisCount(v.valueType);
+	if (n >= 1) v.value.x = apply(v.value.x, x);
+	if (n >= 2) v.value.y = apply(v.value.y, y);
+	if (n >= 3) v.value.z = apply(v.value.z, z);
 	return v;
 }
 

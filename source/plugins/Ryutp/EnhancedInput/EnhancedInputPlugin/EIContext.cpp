@@ -75,13 +75,14 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 
 			float keyValue = primary.key.getValue(gpDevice);
 			EIActionValue primaryValue{action->valueType, {keyValue, 0, 0}};
+			EIKeyFrameEvents primaryEvents = primary.key.getFrameEvents(gpDevice);
 
 			// Primary binding triggers
 			eTriggerState combinedState = eTriggerState::None;
 			for (const auto &trigger : primary.triggers)
 			{
 				if (trigger)
-					combinedState |= trigger->update(primaryValue);
+					combinedState |= trigger->update(primaryValue, primaryEvents);
 			}
 
 			// AND gates (remaining bindings).
@@ -107,12 +108,13 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 
 				float andValue = andKey.key.getValue(gpDevice);
 				EIActionValue andBindingValue{action->valueType, {andValue, 0, 0}};
+				EIKeyFrameEvents andEvents = andKey.key.getFrameEvents(gpDevice);
 
 				eTriggerState andState = eTriggerState::None;
 				for (const auto &trigger : andKey.triggers)
 				{
 					if (trigger)
-						andState |= trigger->update(andBindingValue);
+						andState |= trigger->update(andBindingValue, andEvents);
 				}
 				if (andState == eTriggerState::None)
 				{
@@ -141,12 +143,15 @@ Vector<EIActionValueInstance> EIContextImpl::evaluate(int gamepadIndex, bool use
 					value = modifier->modify(value);
 			}
 
-			// Action-level triggers
+			// Action-level triggers run on the post-modifier action value,
+			// which has no underlying single key — pass empty events so the
+			// triggers fall back to threshold-crossing on v itself.
 			eTriggerState state = combinedState;
+			EIKeyFrameEvents noEvents;
 			for (const auto &trigger : action->triggers)
 			{
 				if (trigger)
-					state |= trigger->update(value);
+					state |= trigger->update(value, noEvents);
 			}
 
 			// Consume keys

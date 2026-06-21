@@ -183,7 +183,16 @@ public:
 
 	virtual const char *getClassName() const noexcept = 0;
 
-	virtual eTriggerState update(EIActionValue v) = 0;
+	// `events` summarizes physical press / release events for the underlying
+	// key during this frame. Bindings-level triggers receive populated
+	// events; action-level triggers receive an empty struct (the action
+	// value has no single key) and fall back to threshold-crossing on v.
+	virtual eTriggerState update(EIActionValue v, const EIKeyFrameEvents &events) = 0;
+
+	// Convenience overload for callers that don't have per-frame events
+	// (self-tests, ad-hoc usage). Equivalent to update(v, {}), so triggers
+	// fall back to threshold-crossing detection.
+	eTriggerState update(EIActionValue v) { return update(v, EIKeyFrameEvents{}); }
 
 	virtual void serialize(EISerializer &s) { s.io("threshold", threshold); }
 };

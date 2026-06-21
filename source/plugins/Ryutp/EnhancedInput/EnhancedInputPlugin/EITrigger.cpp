@@ -1,36 +1,51 @@
 #include "EITrigger.h"
 #include "EITestHooks.h"
 
-eTriggerState EITriggerBase::update(EIActionValue v)
+namespace
 {
-	auto state = updateImpl(v);
+// InputEvent::getTimestamp() returns microseconds. Helper converts a span
+// between two timestamps into seconds for trigger duration math.
+inline float seconds_between(unsigned long long t_later, unsigned long long t_earlier)
+{
+	if (t_later <= t_earlier)
+		return 0.0f;
+	return (t_later - t_earlier) / 1'000'000.0f;
+}
+}
+
+eTriggerState EITriggerBase::update(EIActionValue v, const EIKeyFrameEvents &events)
+{
+	auto state = updateImpl(v, events);
 	lastValue = v;
 	return state;
 }
 
-eTriggerState EITriggerDown::updateImpl(EIActionValue v)
+eTriggerState EITriggerDown::updateImpl(EIActionValue v, const EIKeyFrameEvents &)
 {
+	// Continuous: state of v this frame is all that matters. Sub-frame
+	// press+release would still leave isActive=false here, but that's the
+	// right semantic for Down — "Pressed" is the trigger to use for taps.
 	return isActive(v) ? eTriggerState::Triggered : eTriggerState::None;
 }
 
-eTriggerState EITriggerUp::updateImpl(EIActionValue v)
+eTriggerState EITriggerUp::updateImpl(EIActionValue v, const EIKeyFrameEvents &)
 {
 	return isActive(v) ? eTriggerState::None : eTriggerState::Triggered;
 }
 
-eTriggerState EITriggerPressed::updateImpl(EIActionValue v)
+eTriggerState EITriggerPressed::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
-	return isActive(v) && !isActive(lastValue) ? eTriggerState::Triggered : eTriggerState::None;
+	// Fires on any press event this frame — catches sub-frame taps that
+	// would be lost by the old lastValue-vs-v comparison.
+	return wasPressed(v, events) ? eTriggerState::Triggered : eTriggerState::None;
 }
 
-eTriggerState EITriggerReleased::updateImpl(EIActionValue v)
+eTriggerState EITriggerReleased::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
+	if (wasReleased(v, events))
+		return eTriggerState::Triggered;
 	if (isActive(v))
 		return eTriggerState::Ongoing;
-
-	if (isActive(lastValue))
-		return eTriggerState::Triggered;
-
 	return eTriggerState::None;
 }
 
@@ -39,7 +54,7 @@ float EITriggerTimeBased::calcHeldDur() const
 	return heldDuration + EITestHooks::currentDeltaTime();
 }
 
-eTriggerState EITriggerTimeBased::updateImpl(EIActionValue v)
+eTriggerState EITriggerTimeBased::updateImpl(EIActionValue v, const EIKeyFrameEvents &)
 {
 	if (!isActive(v))
 	{
@@ -51,9 +66,9 @@ eTriggerState EITriggerTimeBased::updateImpl(EIActionValue v)
 	return eTriggerState::Ongoing;
 }
 
-eTriggerState EITriggerHold::updateImpl(EIActionValue v)
+eTriggerState EITriggerHold::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
-	auto state = EITriggerTimeBased::updateImpl(v);
+	auto state = EITriggerTimeBased::updateImpl(v, events);
 
 	bool isFirstTriggered = !_triggered;
 	_triggered = heldDuration >= holdThreshold;
@@ -67,11 +82,11 @@ eTriggerState EITriggerHold::updateImpl(EIActionValue v)
 	return state;
 }
 
-eTriggerState EITriggerHoldAndRelease::updateImpl(EIActionValue v)
+eTriggerState EITriggerHoldAndRelease::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
 	float d = calcHeldDur();
 
-	auto state = EITriggerTimeBased::updateImpl(v);
+	auto state = EITriggerTimeBased::updateImpl(v, events);
 
 	if (d >= holdThreshold && state == eTriggerState::None)
 		state = eTriggerState::Triggered;
@@ -79,11 +94,25 @@ eTriggerState EITriggerHoldAndRelease::updateImpl(EIActionValue v)
 	return state;
 }
 
-eTriggerState EITriggerTap::updateImpl(EIActionValue v)
+eTriggerState EITriggerTap::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
-	float lastHeldDuration = heldDuration;
-	auto state = EITriggerTimeBased::updateImpl(v);
+	// Sub-frame tap (press AND release in this frame): use event timestamps
+	// for a precise duration — frame-rounded heldDuration would be 0 here
+	// since isActive(v) is false. Without this branch a tap entirely inside
+	// one frame is lost.
+	if (events.pressCount > 0 && events.releaseCount > 0 && !isActive(v))
+	{
+		float dur = seconds_between(events.lastReleaseTime, events.firstPressTime);
+		EITriggerTimeBased::updateImpl(v, events);  // resets heldDuration to 0
+		if (dur <= tapReleaseTime)
+			return eTriggerState::Triggered;
+		return eTriggerState::None;
+	}
 
+	float lastHeldDuration = heldDuration;
+	auto state = EITriggerTimeBased::updateImpl(v, events);
+
+	// Multi-frame tap: released after some active frames.
 	if (isActive(lastValue) && state == eTriggerState::None && lastHeldDuration < tapReleaseTime)
 		return eTriggerState::Triggered;
 
@@ -93,9 +122,9 @@ eTriggerState EITriggerTap::updateImpl(EIActionValue v)
 	return state;
 }
 
-eTriggerState EITriggerPulse::updateImpl(EIActionValue v)
+eTriggerState EITriggerPulse::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
-	auto state = EITriggerTimeBased::updateImpl(v);
+	auto state = EITriggerTimeBased::updateImpl(v, events);
 
 	if (state == eTriggerState::Ongoing)
 	{
@@ -125,11 +154,11 @@ eTriggerState EITriggerPulse::updateImpl(EIActionValue v)
 	return state;
 }
 
-eTriggerState EITriggerRepeatedTap::updateImpl(EIActionValue v)
+eTriggerState EITriggerRepeatedTap::updateImpl(EIActionValue v, const EIKeyFrameEvents &events)
 {
 	float dt = EITestHooks::currentDeltaTime();
 	float lastHeldDuration = heldDuration;
-	auto state = EITriggerTimeBased::updateImpl(v);
+	auto state = EITriggerTimeBased::updateImpl(v, events);
 
 	// Accumulate inter-tap time only when we already have a tap pending —
 	// otherwise a freshly-loaded trigger would tick this for nothing.
@@ -152,8 +181,14 @@ eTriggerState EITriggerRepeatedTap::updateImpl(EIActionValue v)
 		return eTriggerState::None;
 	}
 
-	bool justReleased = isActive(lastValue) && state == eTriggerState::None;
-	bool isTap = justReleased && lastHeldDuration < tapReleaseTime;
+	// Sub-frame tap: precise duration via timestamps.
+	bool subFrameTap = events.pressCount > 0 && events.releaseCount > 0
+		&& !isActive(v)
+		&& seconds_between(events.lastReleaseTime, events.firstPressTime) <= tapReleaseTime;
+	// Multi-frame tap: just released after a short hold.
+	bool multiFrameTap = isActive(lastValue) && state == eTriggerState::None
+		&& lastHeldDuration < tapReleaseTime;
+	bool isTap = subFrameTap || multiFrameTap;
 
 	if (isTap)
 	{

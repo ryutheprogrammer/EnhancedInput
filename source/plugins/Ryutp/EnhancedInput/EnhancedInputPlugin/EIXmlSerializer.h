@@ -46,7 +46,13 @@ public:
 		if (!v)
 			return;
 		if (auto x = find(name))
+		{
+			// Curve2d::load appears to append; without an explicit clear the
+			// ctor-installed default keys would stack on top of the loaded
+			// state. Cheap call, removes the ambiguity.
+			v->clear();
 			v->load(x);
+		}
 	}
 
 protected:

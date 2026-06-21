@@ -9,10 +9,28 @@ public:
 
 	bool isActive(const EIActionValue &v) const { return v.getMagnitude2() >= threshold * threshold; }
 
-	eTriggerState update(EIActionValue v) override;
+	// Physical press / release this frame OR a threshold-crossing fallback
+	// for analog inputs where events.pressCount stays 0. The fallback
+	// preserves the old 2-frame-comparison behavior for axes, which never
+	// fire discrete events.
+	bool wasPressed(const EIActionValue &v, const EIKeyFrameEvents &events) const
+	{
+		return events.pressCount > 0 || (isActive(v) && !isActive(lastValue));
+	}
+	bool wasReleased(const EIActionValue &v, const EIKeyFrameEvents &events) const
+	{
+		return events.releaseCount > 0 || (!isActive(v) && isActive(lastValue));
+	}
+
+	eTriggerState update(EIActionValue v, const EIKeyFrameEvents &events) override;
+
+	// Override of the 2-arg form hides the 1-arg convenience overload via
+	// name lookup. Bring it back so `t.update(val)` keeps working for
+	// callers (self-tests, ad-hoc code) that don't have events to pass.
+	using EITrigger::update;
 
 protected:
-	virtual eTriggerState updateImpl(EIActionValue v) = 0;
+	virtual eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) = 0;
 };
 
 class EITriggerDown: public EITriggerBase
@@ -21,7 +39,7 @@ public:
 	const char *getClassName() const noexcept override { return "Down"; }
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerUp: public EITriggerBase
@@ -30,7 +48,7 @@ public:
 	const char *getClassName() const noexcept override { return "Up"; }
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerPressed: public EITriggerBase
@@ -39,7 +57,7 @@ public:
 	const char *getClassName() const noexcept override { return "Pressed"; }
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerReleased: public EITriggerBase
@@ -48,7 +66,7 @@ public:
 	const char *getClassName() const noexcept override { return "Released"; }
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerTimeBased: public EITriggerBase
@@ -59,7 +77,7 @@ public:
 	float calcHeldDur() const;
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerHold: public EITriggerTimeBased
@@ -81,7 +99,7 @@ public:
 	}
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 
 private:
 	bool _triggered = false;
@@ -101,7 +119,7 @@ public:
 	}
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 class EITriggerTap: public EITriggerTimeBased
@@ -118,7 +136,7 @@ public:
 	}
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 };
 
 // Fires Triggered every `interval` seconds while held. Optionally caps at
@@ -142,7 +160,7 @@ public:
 	}
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 
 private:
 	int _triggerCount = 0;
@@ -169,7 +187,7 @@ public:
 	}
 
 protected:
-	eTriggerState updateImpl(EIActionValue v) override;
+	eTriggerState updateImpl(EIActionValue v, const EIKeyFrameEvents &events) override;
 
 private:
 	int _tapCount = 0;
