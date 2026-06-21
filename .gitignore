@@ -24,3 +24,6 @@
 !/source/plugins/Ryutp/
 /source/plugins/Ryutp/*
 !/source/plugins/Ryutp/EnhancedInput/
+
+!build.sh
+!build.bat
