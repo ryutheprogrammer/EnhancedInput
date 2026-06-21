@@ -27,6 +27,12 @@ endif()
 
 find_package(Engine REQUIRED MODULE)
 
+# The plugin's own public headers live in <repo>/include and are included as
+# <plugins/Ryutp/EnhancedInput/...>; the source tree is <repo>/source/plugins/...
+# Add that root so the build doesn't depend on the caller passing it in.
+get_filename_component(EI_REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../../.." ABSOLUTE)
+list(APPEND UNIGINE_INCLUDE_DIR "${EI_REPO_ROOT}/include")
+
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 	set(UNIGINE_COMPILER_IS_MSVC TRUE)
 elseif(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
