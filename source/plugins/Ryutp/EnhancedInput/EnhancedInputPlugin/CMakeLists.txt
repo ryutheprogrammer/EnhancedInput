@@ -6,9 +6,17 @@ set(plugin_name EnhancedInput)
 
 set(target ${PROJECT_NAME})
 
-set(UNIGINE_BIN_DIR ${UNIGINE_SDK_PATH}bin)
-set(UNIGINE_LIB_DIR ${UNIGINE_SDK_PATH}lib)
-set(UNIGINE_INCLUDE_DIR ${UNIGINE_SDK_PATH}include)
+# Overridable so a standalone build can find the engine in the SDK
+# (LIB/INCLUDE) yet drop the .so into the repo (BIN -> OUTPUT_PLUGIN_DIR).
+if(NOT DEFINED UNIGINE_BIN_DIR)
+	set(UNIGINE_BIN_DIR ${UNIGINE_SDK_PATH}bin)
+endif()
+if(NOT DEFINED UNIGINE_LIB_DIR)
+	set(UNIGINE_LIB_DIR ${UNIGINE_SDK_PATH}lib)
+endif()
+if(NOT DEFINED UNIGINE_INCLUDE_DIR)
+	set(UNIGINE_INCLUDE_DIR ${UNIGINE_SDK_PATH}include)
+endif()
 set(OUTPUT_PLUGIN_DIR ${UNIGINE_BIN_DIR}/plugins/${vendor_name}/${plugin_name})
 
 set(binary_name ${vendor_name}${target})
