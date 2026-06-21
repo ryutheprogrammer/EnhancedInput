@@ -16,6 +16,14 @@ set(CMAKE_SKIP_BUILD_RPATH TRUE)
 set(CMAKE_INSTALL_RPATH "$ORIGIN")
 
 list(APPEND CMAKE_MODULE_PATH ${UNIGINE_SDK_PATH}source/cmake/modules)
+# FindEditor.cmake ships only here, not under source/cmake/modules.
+list(APPEND CMAKE_MODULE_PATH ${UNIGINE_SDK_PATH}utils/project/ide/CMake/cmake/modules)
+
+# The SDK's FindEngine only appends _x64 to the lib name when UNIGINE_PC is set
+# (the full SDK cmake sets it; a standalone build must too). PC = Linux/Windows.
+if(NOT DEFINED UNIGINE_PC)
+	set(UNIGINE_PC TRUE)
+endif()
 
 find_package(Engine REQUIRED MODULE)
 
