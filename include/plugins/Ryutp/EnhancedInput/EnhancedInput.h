@@ -210,6 +210,12 @@ struct EIMapping final
 	// bindings[0] is the value source ("primary"); bindings[1..] act as AND gates
 	// (their value is ignored — only their trigger-state activity is checked).
 	Unigine::Vector<EIKeyBinding> bindings;
+	// Human-readable label for this specific alternative, for rebinding UI.
+	// EIActionMappings::description names the action as a whole ("Move"); this
+	// names one row of it ("Move Forward"), which is what a settings screen
+	// lists. Empty means "no dedicated label" — fall back to the action
+	// description plus the key names.
+	Unigine::String description = "";
 	bool consumeInput = false;
 };
 

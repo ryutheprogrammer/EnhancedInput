@@ -332,6 +332,22 @@ void renderCreatorList(QObject *owner, QVBoxLayout *layout, const QString &title
 	layout->addWidget(tree);
 }
 
+// Mapping row label: the key combo "A + B + C", prefixed with the mapping
+// description when it has one ("Move Forward — W").
+QString mappingRowLabel(const EIMapping &mapping)
+{
+	QString combined;
+	for (int bi = 0; bi < mapping.bindings.size(); ++bi)
+	{
+		if (bi > 0)
+			combined += " + ";
+		combined += mapping.bindings[bi].key.getName().get();
+	}
+	if (!mapping.description.empty())
+		combined = QString("%1 — %2").arg(mapping.description.get(), combined);
+	return combined;
+}
+
 } // namespace
 
 EIQtEditorWindow::EIQtEditorWindow(QWidget *parent)
@@ -958,16 +974,7 @@ void EIQtEditorWindow::populateMiddleForContext()
 		{
 			auto &mapping = entry.mappings[mi];
 
-			// Combined header label "A + B + C" from all bindings.
-			QString combined;
-			for (int bi = 0; bi < mapping.bindings.size(); ++bi)
-			{
-				if (bi > 0)
-					combined += " + ";
-				combined += mapping.bindings[bi].key.getName().get();
-			}
-
-			auto *mappingItem = new QTreeWidgetItem(QStringList(combined));
+			auto *mappingItem = new QTreeWidgetItem(QStringList(mappingRowLabel(mapping)));
 			actionItem->addChild(mappingItem);
 
 			// Mapping row col 1: + (add binding) and × (remove mapping).
@@ -1228,15 +1235,8 @@ void EIQtEditorWindow::updateSelectionItemText()
 	if (!mapping)
 		return;
 
-	// Always refresh the combined mapping-row label "A + B + C".
-	QString combined;
-	for (int bi = 0; bi < mapping->bindings.size(); ++bi)
-	{
-		if (bi > 0)
-			combined += " + ";
-		combined += mapping->bindings[bi].key.getName().get();
-	}
-	mappingItem->setText(0, combined);
+	// Always refresh the mapping-row label — key combo plus description.
+	mappingItem->setText(0, mappingRowLabel(*mapping));
 
 	// If a binding child is selected, also refresh its own row label.
 	if (_currentBindingIdx >= 0 && _currentBindingIdx < mapping->bindings.size())
@@ -1324,9 +1324,14 @@ void EIQtEditorWindow::populateInspectorForMapping(EIMapping *mapping)
 		form->addRow("Key", picker);
 	}
 
-	EIQtInspectorSerializer s(form, [this] { markDirty(); });
+	// Description edits show up in the tree row label as you type — the label
+	// is set directly, so the line edit keeps focus (no inspector rebuild).
+	EIQtInspectorSerializer s(form, onKeyOnly);
 	if (showMappingProps)
+	{
+		s.io("Description", mapping->description);
 		s.io("Consume input", mapping->consumeInput);
+	}
 	_rightLayout->addLayout(form);
 
 	if (binding)
