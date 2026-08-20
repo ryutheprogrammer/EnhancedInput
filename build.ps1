@@ -13,8 +13,8 @@
 #   2. -Sdk <id|path>
 #   3. SDK Browser registry: the only installed SDK, else interactive picker.
 #
-# Editor plugin needs Qt 6.5.3 -- $env:UNIGINE_QTROOT must point at it, and
-# run from a "x64 Native Tools Command Prompt for VS" so cl.exe is on PATH.
+# Editor plugin needs Qt 6.5.3 -- $env:UNIGINE_QTROOT must point at it. The x64
+# MSVC toolchain (cl.exe, ninja) is pulled in automatically from the newest VS.
 
 [CmdletBinding()]
 param([string]$Sdk)
@@ -65,11 +65,63 @@ function Resolve-SdkPath {
 	return $installed.($ids[$idx]).TrimEnd('\', '/')
 }
 
+function Find-VsWhere {
+	foreach ($root in ${env:ProgramFiles(x86)}, $env:ProgramFiles) {
+		if (-not $root) { continue }
+		$p = Join-Path $root 'Microsoft Visual Studio\Installer\vswhere.exe'
+		if (Test-Path -LiteralPath $p) { return $p }
+	}
+}
+
+# CMake needs cl.exe and ninja on PATH; a plain PowerShell session has neither.
+# Pull the x64 MSVC environment in ourselves rather than making the user start
+# from a "x64 Native Tools Command Prompt for VS".
+function Initialize-BuildTools {
+	$vswhere = Find-VsWhere
+	$vsPath = if ($vswhere) {
+		& $vswhere -latest -products '*' -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 `
+			-property installationPath | Select-Object -First 1
+	}
+
+	if (-not (Get-Command cl.exe -ErrorAction SilentlyContinue)) {
+		if (-not $vsPath) { throw "No Visual Studio with the C++ toolset (Microsoft.VisualStudio.Component.VC.Tools.x86.x64) -- install it, or run from a 'x64 Native Tools Command Prompt for VS'." }
+		$devShell = Join-Path $vsPath 'Common7\Tools\Microsoft.VisualStudio.DevShell.dll'
+		if (-not (Test-Path -LiteralPath $devShell)) { throw "Missing '$devShell'; run from a 'x64 Native Tools Command Prompt for VS' instead." }
+		Import-Module $devShell
+		# VsDevCmd.bat internals call bare vswhere.exe, so it must be on PATH.
+		$env:PATH = "$(Split-Path -Parent $vswhere);$env:PATH"
+		Enter-VsDevShell -VsInstallPath $vsPath -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+		Write-Host "MSVC: $vsPath (x64)"
+	}
+
+	# Vars set via setx or the System dialog never reach an already-running
+	# shell, so read UNIGINE_QTROOT back from the registry instead of making
+	# the user restart the terminal.
+	if (-not ($env:UNIGINE_QTROOT -and (Test-Path -LiteralPath $env:UNIGINE_QTROOT))) {
+		foreach ($scope in 'User', 'Machine') {
+			$qt = [Environment]::GetEnvironmentVariable('UNIGINE_QTROOT', $scope)
+			if ($qt -and (Test-Path -LiteralPath $qt)) { $env:UNIGINE_QTROOT = $qt; break }
+		}
+		if ($env:UNIGINE_QTROOT) { Write-Host "Qt: $env:UNIGINE_QTROOT" }
+		else { Write-Warning "UNIGINE_QTROOT is unset -- the editor plugin needs Qt 6.5.3." }
+	}
+
+	if (-not (Get-Command ninja.exe -ErrorAction SilentlyContinue)) {
+		$ninjaDir = if ($vsPath) { Join-Path $vsPath 'Common7\IDE\CommonExtensions\Microsoft\CMake\Ninja' }
+		if (-not ($ninjaDir -and (Test-Path -LiteralPath (Join-Path $ninjaDir 'ninja.exe')))) {
+			throw "Ninja not on PATH -- install it, or add the 'C++ CMake tools for Windows' VS component."
+		}
+		$env:PATH = "$ninjaDir;$env:PATH"
+		Write-Host "Ninja: $ninjaDir"
+	}
+}
+
 $SdkPath = Resolve-SdkPath
 if (-not (Test-Sdk $SdkPath)) { throw "'$SdkPath' is not a valid SDK." }
 $SdkFwd  = $SdkPath -replace '\\', '/'
 $RepoFwd = $RepoDir -replace '\\', '/'
 Write-Host "SDK: $SdkPath"
+Initialize-BuildTools
 
 $configs = @(
 	@{ type = 'Debug';   precision = 'double'; dbl = 1 },
@@ -92,7 +144,7 @@ foreach ($c in $configs) {
 		"-DUNIGINE_DOUBLE=$($c.dbl)" `
 		"-DUNIGINE_SDK_PATH=$SdkFwd/" `
 		"-DUNIGINE_BIN_DIR=$RepoFwd/bin" `
-		"-DUNIGINE_LIB_DIR=$SdkFwd/bin" `
+		"-DUNIGINE_LIB_DIR=$SdkFwd/lib" `
 		"-DUNIGINE_INCLUDE_DIR=$SdkFwd/include;$RepoFwd/include"
 	if ($LASTEXITCODE -ne 0) { throw "configure failed ($($c.type)/$($c.precision))" }
 
